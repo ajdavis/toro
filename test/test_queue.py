@@ -1,8 +1,17 @@
-# TODO: complete test suite from gevent's test__queue.py
+"""
+Test toro.Queue.
+
+There are three sections, one each for tests that are
+1. adapted from Gevent's test_queue.py, except for FailingQueueTest of which I
+   don't understand the purpose,
+2. adapted from Gevent's test__queue.py,
+3. written specifically for Toro.
+"""
+
 import time
+import unittest
 from Queue import Empty, Full
 
-from tornado import testing
 from tornado import gen
 from tornado.gen import Task
 from tornado.ioloop import IOLoop
@@ -10,32 +19,188 @@ from tornado.ioloop import IOLoop
 import toro
 from test.async_test_engine import async_test_engine
 
+# SECTION 1: Tests adapted from Gevent's test_queue.py (single underscore)
 
-# TODO: move to __init__, copy Gevent's docs for this
-class AsyncResult(object):
-    def __init__(self):
-        self._ready = False
-        self.value = None
-        self.callback = None
+QUEUE_SIZE = 5
 
-    def set(self, value):
-        self.value = value
-        self._ready = True
-        if self.callback:
-            callback, self.callback = self.callback, None
-            callback(self.value)
 
-    def ready(self):
-        return self._ready
+class _TriggerTask(object):
+    def __init__(self, fn, args, kwargs):
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.startedEvent = toro.Event()
+        IOLoop.instance().add_timeout(time.time() + 0.1, self.run)
 
-    def get(self, callback):
-        if self.ready():
-            callback(self.value)
+    def run(self):
+        self.startedEvent.set()
+        self.fn(*self.args, **self.kwargs)
+
+
+class BaseQueueTest(unittest.TestCase):
+    @gen.engine
+    def do_blocking_test(self, block_func, block_args, block_kwargs, trigger_func, trigger_args, trigger_kwargs, callback):
+        self.t = _TriggerTask(trigger_func, trigger_args, trigger_kwargs)
+        self.result = yield Task(block_func, *block_args, **block_kwargs)
+        # If block_func returned before our thread made the call, we failed!
+        if not self.t.startedEvent.isSet():
+            self.fail("blocking function '%r' appeared not to block" %
+                      block_func)
+        callback(self.result)
+
+    # Call this instead if block_func is supposed to raise an exception.
+    def do_exceptional_blocking_test(self,block_func, block_args, trigger_func,
+                                   trigger_args, expected_exception_class):
+        self.t = _TriggerThread(trigger_func, trigger_args)
+        self.t.start()
+        try:
+            try:
+                block_func(*block_args)
+            except expected_exception_class:
+                raise
+            else:
+                self.fail("expected exception of kind %r" %
+                                 expected_exception_class)
+        finally:
+            self.t.join(10) # make sure the thread terminates
+            if self.t.isAlive():
+                self.fail("trigger function '%r' appeared to not return" %
+                                 trigger_func)
+            if not self.t.startedEvent.isSet():
+                self.fail("trigger thread ended but event never set")
+
+    @gen.engine
+    def simple_queue_test(self, q, callback):
+        if not q.empty():
+            raise RuntimeError, "Call this function with an empty queue"
+        # I guess we better check things actually queue correctly a little :)
+        q.put(111)
+        q.put(333)
+        q.put(222)
+        target_order = dict(Queue=[111, 333, 222],
+                            LifoQueue=[222, 333, 111],
+                            PriorityQueue=[111, 222, 333])
+        actual_order = [q.get(), q.get(), q.get()]
+        self.assertEquals(actual_order, target_order[q.__class__.__name__],
+                          "Didn't seem to queue the correct data!")
+        for i in range(QUEUE_SIZE-1):
+            q.put(i)
+            self.assert_(not q.empty(), "Queue should not be empty")
+        self.assert_(not q.full(), "Queue should not be full")
+        q.put("last")
+        self.assert_(q.full(), "Queue should be full")
+        try:
+            q.put("full")
+            self.fail("Didn't appear to block with a full queue")
+        except Full:
+            pass
+
+        # False is passed to the put() callback if it times out
+        self.assertFalse((yield Task(q.put, "full", timeout=0.01)))
+        self.assertEquals(q.qsize(), QUEUE_SIZE)
+        # Test a blocking put
+        yield Task(self.do_blocking_test, q.put, ("full",), {}, q.get, (), {})
+        yield Task(self.do_blocking_test, q.put, ("full",), {'timeout': 10}, q.get, (), {})
+        # Empty it
+        for i in range(QUEUE_SIZE):
+            q.get()
+        self.assert_(q.empty(), "Queue should be empty")
+        try:
+            q.get()
+            self.fail("Didn't appear to block with an empty queue")
+        except Empty:
+            pass
+        # Empty is passed to the get() callback if it times out
+        self.assertEqual(Empty, (yield Task(q.get, timeout=0.01)))
+        # Test a blocking get
+        yield Task(self.do_blocking_test, q.get, (), {}, q.put, ('empty',), {})
+        yield Task(self.do_blocking_test, q.get, (), {'timeout': 10}, q.put, ('empty',), {})
+        callback()
+
+    @async_test_engine()
+    def test_simple_queue(self):
+        # Do it a couple of times on the same queue.
+        # Done twice to make sure works with same instance reused.
+        q = self.type2test(QUEUE_SIZE)
+        yield Task(self.simple_queue_test, q)
+        yield Task(self.simple_queue_test, q)
+
+BaseQueueTest.__test__ = False # Hide from nosetests
+
+
+class QueueTest1(BaseQueueTest):
+    type2test = toro.Queue
+
+
+class LifoQueueTest1(BaseQueueTest):
+    type2test = toro.LifoQueue
+
+
+class PriorityQueueTest1(BaseQueueTest):
+    type2test = toro.PriorityQueue
+
+
+class TestJoinableQueue1(unittest.TestCase):
+    def setUp(self):
+        self.cum = 0
+
+    def test_queue_task_done(self):
+        # Test to make sure a queue task completed successfully.
+        q = toro.JoinableQueue()
+        # XXX the same test in subclasses
+        try:
+            q.task_done()
+        except ValueError:
+            pass
         else:
-            self.callback = callback
+            self.fail("Did not detect task count going negative")
+
+    @gen.engine
+    def worker(self, q):
+        while True:
+            x = yield Task(q.get)
+            if x is None:
+                q.task_done()
+                break
+
+            self.cum += x
+            q.task_done()
+
+    @gen.engine
+    def queue_join_test(self, q, callback):
+        self.cum = 0
+        for i in (0,1):
+            self.worker(q)
+        for i in xrange(100):
+            q.put(i)
+        yield Task(q.join)
+        self.assertEquals(self.cum, sum(range(100)),
+                          "q.join() did not block until all tasks were done")
+        for i in (0,1):
+            q.put(None)         # instruct the tasks to end
+        yield Task(q.join)      # verify that you can join twice
+        callback()
+
+    queue_join_test.__test__ = False # It's a utility, hide it from nosetests
+
+    @async_test_engine()
+    def test_queue_join(self):
+        # Test that a queue join()s successfully, and before anything else
+        # (done twice for insurance).
+        q = toro.JoinableQueue()
+        yield Task(self.queue_join_test, q)
+        yield Task(self.queue_join_test, q)
+        try:
+            q.task_done()
+        except ValueError:
+            pass
+        else:
+            self.fail("Did not detect task count going negative")
 
 
-class TestQueue(testing.AsyncTestCase):
+# SECTION 2: Tests adapted from Gevent's test__queue.py (double underscore)
+
+class TestQueue2(unittest.TestCase):
     def test_repr(self):
         # No exceptions
         str(toro.Queue())
@@ -103,8 +268,8 @@ class TestQueue(testing.AsyncTestCase):
             x = yield Task(q.get)
             evt.set(x)
 
-        e1 = AsyncResult()
-        e2 = AsyncResult()
+        e1 = toro.AsyncResult()
+        e2 = toro.AsyncResult()
 
         sender(e1, q)
         yield Task(loop.add_timeout, time.time() + .1)
@@ -123,7 +288,7 @@ class TestQueue(testing.AsyncTestCase):
             evt.set((yield Task(q.get)))
 
         sendings = ['1', '2', '3', '4']
-        evts = [AsyncResult() for x in sendings]
+        evts = [toro.AsyncResult() for x in sendings]
         for i, x in enumerate(sendings):
             waiter(q, evts[i]) # start task
 
@@ -171,7 +336,7 @@ class TestQueue(testing.AsyncTestCase):
     # TODO: test non-blocking puts and gets
 
 
-class TestChannel(testing.AsyncTestCase):
+class TestChannel2(unittest.TestCase):
 
     @async_test_engine()
     def test_send(self):
@@ -234,7 +399,7 @@ class TestChannel(testing.AsyncTestCase):
         yield gen.Wait('put')
 
 
-class TestNoWait(testing.AsyncTestCase):
+class TestNoWait2(unittest.TestCase):
 
     def test_put_nowait_simple(self):
         q = toro.Queue(1)
@@ -281,11 +446,17 @@ class TestNoWait(testing.AsyncTestCase):
         assert q.empty(), q
 
 
-class TestJoinEmpty(testing.AsyncTestCase):
+class TestJoinEmpty2(unittest.TestCase):
 
     @async_test_engine()
     def test_issue_45(self):
-        """Test that join() exits immediatelly if not jobs were put into the queue"""
+        """Test that join() exits immediately if not jobs were put into the queue
+           From Gevent's test_issue_45()
+        """
         self.switch_expected = False
-        q = queue.JoinableQueue()
-        q.join()
+        q = toro.JoinableQueue()
+        yield Task(q.join)
+
+
+# SECTION 3: Tests written specifically for Toro
+# TODO

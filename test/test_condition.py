@@ -1,7 +1,7 @@
-from functools import partial
 import time
+import unittest
 
-from tornado import gen, testing
+from tornado import gen
 from tornado.ioloop import IOLoop
 
 
@@ -15,7 +15,7 @@ def make_callback(key, history):
     return callback
 
 
-class TestCondition(testing.AsyncTestCase):
+class TestCondition(unittest.TestCase):
     @async_test_engine()
     def test_notify(self):
         loop = IOLoop.instance()

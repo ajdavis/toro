@@ -19,7 +19,9 @@ __all__ = [
     'LifoQueue'
 ]
 
+
 class _Waiter(object):
+    """Internal Toro utility class"""
     def __init__(self, timeout, callback):
         self.timeout = timeout # TODO: unnecessary
         self.callback = callback
@@ -28,6 +30,31 @@ class _Waiter(object):
         if self.callback:
             callback, self.callback = self.callback, None
             callback(*args, **kwargs)
+
+
+# TODO: copy Gevent's docs and tests for this
+class AsyncResult(object):
+    def __init__(self, io_loop=None):
+        self.io_loop = io_loop or IOLoop.instance()
+        self._ready = False
+        self.value = None
+        self.callback = None
+
+    def set(self, value):
+        self.value = value
+        self._ready = True
+        if self.callback:
+            callback, self.callback = self.callback, None
+            callback(self.value)
+
+    def ready(self):
+        return self._ready
+
+    def get(self, callback):
+        if self.ready():
+            self.io_loop.add_callback(partial(callback, self.value))
+        else:
+            self.callback = callback
 
 
 # TODO: Note we don't have or need acquire() and release()
@@ -42,6 +69,8 @@ class Condition(object):
             self.waiters.popleft()
 
     def wait(self, timeout=None, callback=None):
+        # TODO: swap callback and timeout?
+        # TODO: True / False argument, called by notify() or timeout?
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
         #   with threading.Condition
@@ -58,20 +87,18 @@ class Condition(object):
         self.waiters.append(waiter)
 
     def notify(self, n=1, callback=None):
-        waiters = []
         self._consume_timed_out_waiters()
+        waiters = [] # Waiters we plan to run right now
 
         # TODO: more elegant version w/ slicing?
         while n and self.waiters:
             waiter = self.waiters.popleft()
             n -= 1
             waiters.append(waiter)
+            self._consume_timed_out_waiters()
 
         for waiter in waiters:
-            # TODO: what if this throws?
-            # ALSO TODO: ok to call these directly or should they be
-            #   scheduled in order on the loop?
-            waiter.run()
+            waiter.run() # TODO: what if this throws?
 
         if callback:
             self.io_loop.add_callback(callback)
@@ -85,7 +112,6 @@ class Condition(object):
 #        return self.waiters.popleft()
 
 # TODO: tests! copy from Gevent.Event tests?
-
 class Event(object):
     """A synchronization primitive that allows one greenlet to wake up one or more others.
     It has the same interface as :class:`threading.Event` but works across greenlets.
@@ -139,7 +165,7 @@ class Event(object):
         Return the value of the internal flag (``True`` or ``False``).
         """
         if self._flag:
-            callback() # TODO: exceptions
+            self.io_loop.add_callback(callback)
         else:
             # TODO: obviously needs to be factored into _Waiter()
             if timeout is not None:
@@ -190,12 +216,14 @@ class Queue(object):
         self.io_loop = io_loop or IOLoop.instance()
         self.maxsize = maxsize
 
-        # Values
-        self.queue = collections.deque([])
-
         # _Waiters
         self.getters = collections.deque([])
+        # Pairs of (item, _Waiter)
         self.putters = collections.deque([])
+        self._init(maxsize)
+
+    def _init(self, maxsize):
+        self.queue = collections.deque()
 
     def _get(self):
         return self.queue.popleft()
@@ -208,7 +236,7 @@ class Queue(object):
             self.getters.popleft()
 
     def _consume_expired_putters(self):
-        while self.putters and not self.putters[0].callback:
+        while self.putters and not self.putters[0][1].callback:
             self.putters.popleft()
 
     def __repr__(self):
@@ -225,8 +253,6 @@ class Queue(object):
             result += ' getters[%s]' % len(self.getters)
         if self.putters:
             result += ' putters[%s]' % len(self.putters)
-        if self._event_unlock is not None:
-            result += ' unlocking'
         return result
 
     def qsize(self):
@@ -267,28 +293,31 @@ class Queue(object):
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
             getter = self.getters.popleft()
-            getter.run(item) # TODO: exception?
+
+            # Call _put and _get in case subclasses have special logic for them
+            self._put(item)
+            getter.run(self._get()) # TODO: exception?
             if callback:
-                callback(True) # TODO: exception?
+                self.io_loop.add_callback(partial(callback, True))
         elif self.maxsize == self.qsize() and callback:
             def _callback(success):
-                if success:
-                    # Didn't time out
-                    self._put(item)
-                self.io_loop.add_callback(partial(callback, success)) # TODO: exception?
+#                if success:
+#                    # Didn't time out
+#                    self._put(item)
+                self.io_loop.add_callback(partial(callback, success))
 
             if timeout is not None:
                 waiter = _Waiter(time.time() + timeout, _callback)
                 self.io_loop.add_timeout(waiter.timeout, partial(waiter.run, False))
             else:
                 waiter = _Waiter(timeout, _callback)
-            self.putters.append(waiter)
+            self.putters.append((item, waiter))
         elif self.maxsize == self.qsize():
             raise Full
         else:
             self._put(item)
             if callback:
-                callback(True) # TODO: exception?
+                self.io_loop.add_callback(partial(callback, True))
 
     def get(self, callback=None, timeout=None):
         """Remove and return an item from the queue.
@@ -305,18 +334,18 @@ class Queue(object):
         #   with Queue.Queue and Gevent's Queue
         self._consume_expired_putters()
         if self.putters:
-            assert self.qsize() == self.maxsize, \
-                "queue not full, why are putters waiting?"
-            putter = self.putters.popleft()
-
-            putter.run(True) # TODO: exception?
+            assert self.full(), "queue not full, why are putters waiting?"
+            item, putter = self.putters.popleft()
+            self._put(item)
             if callback:
-                callback(self._get()) # TODO: exception?
+                callback(self._get())
+                putter.run(True)
             else:
+                self.io_loop.add_callback(partial(putter.run, True))
                 return self._get()
         elif self.qsize():
             if callback:
-                callback(self._get()) # TODO: exception?
+                callback(self._get())
             else:
                 return self._get()
         elif callback:
@@ -347,9 +376,17 @@ class PriorityQueue(Queue):
         return heappop(self.queue)
 
 
-
 class LifoQueue(Queue):
-    pass
+    '''A subclass of :class:`Queue` that retrieves most recently added entries first.'''
+
+    def _init(self, maxsize):
+        self.queue = []
+
+    def _put(self, item):
+        self.queue.append(item)
+
+    def _get(self):
+        return self.queue.pop()
 
 
 class JoinableQueue(Queue):
@@ -397,16 +434,22 @@ class JoinableQueue(Queue):
         that the item was retrieved and all work on it is complete. When the count of
         unfinished tasks drops to zero, :meth:`join` unblocks.
         '''
-        self._cond.wait(callback)
+        if self.unfinished_tasks == 0:
+            self.io_loop.add_callback(callback)
+        else:
+            self._cond.wait(callback)
 
 
+# TODO
 class Semaphore(object):
     pass
 
 
+# TODO
 class BoundedSemaphore(object):
     pass
 
 
+# TODO
 class RLock(object):
     pass
