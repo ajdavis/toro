@@ -1,5 +1,6 @@
 # TODO: complete test suite from gevent's test__queue.py
 import time
+from Queue import Empty, Full
 
 from tornado import testing
 from tornado import gen
@@ -10,7 +11,7 @@ import toro
 from test.async_test_engine import async_test_engine
 
 
-# TODO: useful outside framework?
+# TODO: move to __init__, copy Gevent's docs for this
 class AsyncResult(object):
     def __init__(self):
         self._ready = False
@@ -35,6 +36,11 @@ class AsyncResult(object):
 
 
 class TestQueue(testing.AsyncTestCase):
+    def test_repr(self):
+        # No exceptions
+        str(toro.Queue())
+        repr(toro.Queue())
+
     @async_test_engine()
     def test_send_first(self):
         q = toro.Queue()
@@ -112,113 +118,57 @@ class TestQueue(testing.AsyncTestCase):
         # tests that multiple waiters get their results back
         q = toro.Queue()
 
+        @gen.engine
         def waiter(q, evt):
             evt.set((yield Task(q.get)))
 
         sendings = ['1', '2', '3', '4']
         evts = [AsyncResult() for x in sendings]
         for i, x in enumerate(sendings):
-            gevent.spawn(waiter, q, evts[i])  # use waitall for them
+            waiter(q, evts[i]) # start task
 
-        gevent.sleep(0.01)  # get 'em all waiting
-
-        results = set()
-
-        def collect_pending_results():
-            for i, e in enumerate(evts):
-                timer = gevent.Timeout.start_new(.1)
-                try:
+        @gen.engine
+        def collect_pending_results(callback):
+            results = set()
+            for e in evts:
+                if e.ready():
+                    # Won't block
                     x = yield Task(e.get)
                     results.add(x)
-                    timer.cancel()
-                except gevent.Timeout:
-                    pass  # no pending result at that event
-#            return len(results)
+            callback(len(results))
+
         yield Task(q.put, sendings[0])
-        self.assertEquals(collect_pending_results(), 1)
+        self.assertEquals((yield Task(collect_pending_results)), 1)
         yield Task(q.put, sendings[1])
-        self.assertEquals(collect_pending_results(), 2)
+        self.assertEquals((yield Task(collect_pending_results)), 2)
         yield Task(q.put, sendings[2])
         yield Task(q.put, sendings[3])
-        self.assertEquals(collect_pending_results(), 4)
+        self.assertEquals((yield Task(collect_pending_results)), 4)
 
-    @async_test_engine()
-    def test_waiters_that_cancel(self):
-        q = toro.Queue()
-
-        def do_receive(q, evt):
-            gevent.Timeout.start_new(0, RuntimeError())
-            try:
-                result = yield Task(q.get)
-                evt.set(result)
-            except RuntimeError:
-                evt.set('timed out')
-
-        evt = AsyncResult()
-        gevent.spawn(do_receive, q, evt)
-        self.assertEquals((yield Task(evt.get)), 'timed out')
-
-        yield Task(q.put, 'hi')
-        self.assertEquals((yield Task(q.get)), 'hi')
+    # Gevent's test_waiters_that_cancel isn't relevant to Toro
+    #def test_waiters_that_cancel(self):
 
     @async_test_engine()
     def test_senders_that_die(self):
         q = toro.Queue()
 
+        @gen.engine
         def do_send(q):
             yield Task(q.put, 'sent')
 
-        gevent.spawn(do_send, q)
+        do_send(q)
         self.assertEquals((yield Task(q.get)), 'sent')
 
-    @async_test_engine()
-    def test_two_waiters_one_dies(self):
+    # Gevent's test_two_waiters_one_dies isn't relevant to Toro
+    #def test_two_waiters_one_dies(self):
 
-        def waiter(q, evt):
-            evt.set((yield Task(q.get)))
+    # Gevent's test_two_bogus_waiters isn't relevant to Toro
+    #def test_two_bogus_waiters(self):
 
-        def do_receive(q, evt):
-            timeout = gevent.Timeout.start_new(0, RuntimeError())
-            try:
-                try:
-                    result = yield Task(q.get)
-                    evt.set(result)
-                except RuntimeError:
-                    evt.set('timed out')
-            finally:
-                timeout.cancel()
-
-        q = toro.Queue()
-        dying_evt = AsyncResult()
-        waiting_evt = AsyncResult()
-        gevent.spawn(do_receive, q, dying_evt)
-        gevent.spawn(waiter, q, waiting_evt)
-        gevent.sleep(0)
-        yield Task(q.put, 'hi')
-        self.assertEquals((yield Task(dying_evt.get)), 'timed out')
-        self.assertEquals((yield Task(waiting_evt.get)), 'hi')
-
-    @async_test_engine()
-    def test_two_bogus_waiters(self):
-        def do_receive(q, evt):
-            gevent.Timeout.start_new(0, RuntimeError())
-            try:
-                result = yield Task(q.get)
-                evt.set(result)
-            except RuntimeError:
-                evt.set('timed out')
-            # XXX finally = timeout
-
-        q = toro.Queue()
-        e1 = AsyncResult()
-        e2 = AsyncResult()
-        gevent.spawn(do_receive, q, e1)
-        gevent.spawn(do_receive, q, e2)
-        gevent.sleep(0)
-        yield Task(q.put, 'sent')
-        self.assertEquals((yield Task(e1.get)), 'timed out')
-        self.assertEquals((yield Task(e2.get)), 'timed out')
-        self.assertEquals((yield Task(q.get)), 'sent')
+    # TODO: test timeouts
+    # TODO: test exception-throwing in callbacks
+    # TODO: test StackContext-handling
+    # TODO: test non-blocking puts and gets
 
 
 class TestChannel(testing.AsyncTestCase):
@@ -229,11 +179,13 @@ class TestChannel(testing.AsyncTestCase):
 
         events = []
 
-        def another_greenlet():
+        @gen.engine
+        def another_task(callback):
             events.append((yield Task(channel.get)))
             events.append((yield Task(channel.get)))
+            callback()
 
-        g = gevent.spawn(another_greenlet)
+        another_task(callback=(yield gen.Callback('done')))
 
         events.append('sending')
         channel.put('hello')
@@ -242,120 +194,89 @@ class TestChannel(testing.AsyncTestCase):
         events.append('sent world')
 
         self.assertEqual(['sending', 'hello', 'sent hello', 'world', 'sent world'], events)
-        yield Task(g.get)
+        yield gen.Wait('done')
 
     @async_test_engine()
     def test_wait(self):
         channel = toro.Queue(0)
         events = []
 
-        def another_greenlet():
+        @gen.engine
+        def another_task(callback):
             events.append('sending hello')
-            channel.put('hello')
+            yield Task(channel.put, 'hello')
             events.append('sending world')
-            channel.put('world')
+            yield Task(channel.put, 'world')
             events.append('sent world')
+            callback()
 
-        g = gevent.spawn(another_greenlet)
+        another_task(callback=(yield gen.Callback('done')))
 
         events.append('waiting')
         events.append((yield Task(channel.get)))
         events.append((yield Task(channel.get)))
 
-        self.assertEqual(['waiting', 'sending hello', 'hello', 'sending world', 'world'], events)
-        gevent.sleep(0)
-        self.assertEqual(['waiting', 'sending hello', 'hello', 'sending world', 'world', 'sent world'], events)
-        yield Task(g.get)
+        self.assertEqual(['sending hello', 'waiting', 'hello', 'sending world', 'world'], events)
+        yield Task(IOLoop.instance().add_timeout, time.time() + .1)
+        self.assertEqual(['sending hello', 'waiting', 'hello', 'sending world', 'world', 'sent world'], events)
+        yield gen.Wait('done')
 
     @async_test_engine()
     def test_task_done(self):
-        channel = queue.JoinableQueue(0)
+        channel = toro.JoinableQueue(0)
         X = object()
-        gevent.spawn(channel.put, X)
+        channel.put(X, callback=(yield gen.Callback('put')))
         result = yield Task(channel.get)
         assert result is X, (result, X)
         assert channel.unfinished_tasks == 1, channel.unfinished_tasks
         channel.task_done()
         assert channel.unfinished_tasks == 0, channel.unfinished_tasks
+        yield gen.Wait('put')
 
 
 class TestNoWait(testing.AsyncTestCase):
 
-    @async_test_engine()
     def test_put_nowait_simple(self):
-        result = []
         q = toro.Queue(1)
+        q.put('hi')
+        self.assertRaises(Full, q.put, 'bye')
 
-        def store_result(func, *args):
-            result.append(func(*args))
-
-        core.active_event(store_result, util.wrap_errors(Exception, q.put_nowait), 2)
-        core.active_event(store_result, util.wrap_errors(Exception, q.put_nowait), 3)
-        gevent.sleep(0)
-        assert len(result) == 2, result
-        assert result[0] == None, result
-        assert isinstance(result[1], queue.Full), result
-
-    @async_test_engine()
     def test_get_nowait_simple(self):
-        result = []
         q = toro.Queue(1)
-        yield Task(q.put, 4)
+        q.put(4)
+        self.assertEqual(4, q.get())
+        self.assertRaises(Empty, q.get)
 
-        def store_result(func, *args):
-            result.append(func(*args))
-
-        core.active_event(store_result, util.wrap_errors(Exception, q.get_nowait))
-        core.active_event(store_result, util.wrap_errors(Exception, q.get_nowait))
-        gevent.sleep(0)
-        assert len(result) == 2, result
-        assert result[0] == 4, result
-        assert isinstance(result[1], queue.Empty), result
-
-    # get_nowait must work from the mainloop
     @async_test_engine()
     def test_get_nowait_unlock(self):
-        result = []
         q = toro.Queue(0)
-        p = gevent.spawn(q.put, 5)
 
-        def store_result(func, *args):
-            result.append(func(*args))
+        q.put(5, callback=(yield gen.Callback('done')))
 
         assert q.empty(), q
         assert q.full(), q
-        gevent.sleep(0)
+        yield Task(IOLoop.instance().add_callback)
         assert q.empty(), q
         assert q.full(), q
-        core.active_event(store_result, util.wrap_errors(Exception, q.get_nowait))
-        gevent.sleep(0)
+        self.assertEqual(5, q.get())
         assert q.empty(), q
         assert q.full(), q
-        assert result == [5], result
-        assert p.ready(), p
-        assert p.dead, p
-        assert q.empty(), q
+        yield gen.Wait('done')
 
-    # put_nowait must work from the mainloop
     @async_test_engine()
     def test_put_nowait_unlock(self):
-        result = []
         q = toro.Queue(0)
-        p = gevent.spawn(q.get)
-
-        def store_result(func, *args):
-            result.append(func(*args))
+        q.get(callback=(yield gen.Callback('get')))
 
         assert q.empty(), q
         assert q.full(), q
-        gevent.sleep(0)
+        yield Task(IOLoop.instance().add_callback)
         assert q.empty(), q
         assert q.full(), q
-        core.active_event(store_result, util.wrap_errors(Exception, q.put_nowait), 10)
-        assert not p.ready(), p
-        gevent.sleep(0)
-        assert result == [None], result
-        assert p.ready(), p
+        q.put(10)
+        assert q.full(), q
+        assert q.empty(), q
+        self.assertEqual(10, (yield gen.Wait('get')))
         assert q.full(), q
         assert q.empty(), q
 

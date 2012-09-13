@@ -59,6 +59,7 @@ class TestCondition(testing.AsyncTestCase):
         duration = time.time() - st
         self.assertAlmostEqual(.1, duration, places=2)
 
+    # TODO: test timeout returns True / False
     @async_test_engine()
     def test_wait_timeout_preempted(self):
         loop = IOLoop.instance()
