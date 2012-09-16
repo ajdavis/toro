@@ -426,19 +426,23 @@ class JoinableQueue(Queue):
         if self.unfinished_tasks == 0:
             self._cond.set()
 
-    def join(self, callback):
+    def join(self, callback, timeout=None):
         '''Block until all items in the queue have been gotten and processed.
 
         The count of unfinished tasks goes up whenever an item is added to the queue.
         The count goes down whenever a consumer thread calls :meth:`task_done` to indicate
         that the item was retrieved and all work on it is complete. When the count of
         unfinished tasks drops to zero, :meth:`join` unblocks.
+
+        If timeout is not None, the callback may be executed before all tasks
+        are complete. Check the value of unfinished_tasks after a join() with a
+        timeout to determine if this has happened.
         '''
         if self.unfinished_tasks == 0:
             _check_callback(callback)
             self.io_loop.add_callback(callback)
         else:
-            self._cond.wait(callback)
+            self._cond.wait(callback, timeout)
 
 
 # TODO

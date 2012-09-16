@@ -460,3 +460,16 @@ class TestJoinEmpty2(unittest.TestCase):
 
 # SECTION 3: Tests written specifically for Toro
 # TODO
+
+class TestJoinableQueue3(unittest.TestCase):
+    @async_test_engine()
+    def test_queue_join_timeout(self):
+        # Test that a queue join()s successfully, and before anything else
+        # (done twice for insurance).
+        q = toro.JoinableQueue()
+        q.put(1)
+        st = time.time()
+        yield Task(q.join, timeout=.1)
+        duration = time.time() - st
+        self.assertAlmostEqual(.1, duration, places=2)
+        self.assertEqual(1, q.unfinished_tasks)
