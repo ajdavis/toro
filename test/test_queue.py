@@ -37,7 +37,9 @@ class _TriggerTask(object):
         self.fn(*self.args, **self.kwargs)
 
 
-class BaseQueueTest(unittest.TestCase):
+class QueueTest1(unittest.TestCase):
+    type2test = toro.Queue
+
     @gen.engine
     def do_blocking_test(self, block_func, block_args, block_kwargs, trigger_func, trigger_args, trigger_kwargs, callback):
         self.t = _TriggerTask(trigger_func, trigger_args, trigger_kwargs)
@@ -48,7 +50,10 @@ class BaseQueueTest(unittest.TestCase):
                       block_func)
         callback(self.result)
 
+    do_blocking_test.__test__ = False # Hide from nose
+
     # Call this instead if block_func is supposed to raise an exception.
+    # TODO: useful?
     def do_exceptional_blocking_test(self,block_func, block_args, trigger_func,
                                    trigger_args, expected_exception_class):
         self.t = _TriggerThread(trigger_func, trigger_args)
@@ -68,6 +73,8 @@ class BaseQueueTest(unittest.TestCase):
                                  trigger_func)
             if not self.t.startedEvent.isSet():
                 self.fail("trigger thread ended but event never set")
+
+    do_exceptional_blocking_test.__test__ = False # Hide from nose
 
     @gen.engine
     def simple_queue_test(self, q, callback):
@@ -117,6 +124,8 @@ class BaseQueueTest(unittest.TestCase):
         yield Task(self.do_blocking_test, q.get, (), {'timeout': 10}, q.put, ('empty',), {})
         callback()
 
+    simple_queue_test.__test__ = False # Hide from nose
+
     @async_test_engine()
     def test_simple_queue(self):
         # Do it a couple of times on the same queue.
@@ -125,18 +134,12 @@ class BaseQueueTest(unittest.TestCase):
         yield Task(self.simple_queue_test, q)
         yield Task(self.simple_queue_test, q)
 
-BaseQueueTest.__test__ = False # Hide from nosetests
 
-
-class QueueTest1(BaseQueueTest):
-    type2test = toro.Queue
-
-
-class LifoQueueTest1(BaseQueueTest):
+class LifoQueueTest1(QueueTest1):
     type2test = toro.LifoQueue
 
 
-class PriorityQueueTest1(BaseQueueTest):
+class PriorityQueueTest1(QueueTest1):
     type2test = toro.PriorityQueue
 
 
