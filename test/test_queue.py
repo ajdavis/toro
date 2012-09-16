@@ -453,9 +453,8 @@ class TestJoinEmpty2(unittest.TestCase):
 
     @async_test_engine()
     def test_issue_45(self):
-        """Test that join() exits immediately if not jobs were put into the queue
-           From Gevent's test_issue_45()
-        """
+        # Test that join() exits immediately if not jobs were put into the queue
+        # From Gevent's test_issue_45()
         self.switch_expected = False
         q = toro.JoinableQueue()
         yield Task(q.join)

@@ -310,7 +310,10 @@ class Queue(object):
         elif self.maxsize == self.qsize() and callback:
             _check_callback(callback)
 
-            # TODO: huh?
+            # When a getter runs and frees up a slot so this putter can run,
+            # we need to defer the put callback for one more iteration of the
+            # loop to ensure that getters and putters alternate perfectly.
+            # See TestChannel2.test_wait.
             def _callback(success):
                 self.io_loop.add_callback(partial(callback, success))
 
