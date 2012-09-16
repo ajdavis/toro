@@ -94,8 +94,7 @@ class Condition(object):
         while self.waiters and self.waiters[0].expired:
             self.waiters.popleft()
 
-    def wait(self, timeout=None, callback=None):
-        # TODO: swap callback and timeout?
+    def wait(self, callback=None, timeout=None):
         # TODO: True / False argument, called by notify() or timeout?
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
