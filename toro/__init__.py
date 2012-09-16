@@ -20,16 +20,41 @@ __all__ = [
 ]
 
 
+def _check_callback(callback):
+    """
+    Toro runs this on any callback before registering on IOLoop for future
+    execution, to reduce confusion about the source of a TypeError. Note that
+    calling a callback directly, or putting it in a _Waiter, don't require
+    check_callback().
+    """
+    if not callable(callback):
+        raise TypeError(
+            "callback must be callable, not %s" % repr(callback))
+
+
 class _Waiter(object):
     """Internal Toro utility class"""
-    def __init__(self, timeout, callback):
-        self.timeout = timeout # TODO: unnecessary
+    def __init__(self, timeout, timeout_args, io_loop, callback):
+        """
+        Create a deferred callback. If timeout is not None, it's the number of
+        seconds in the future at which to time-out this waiter. Note that
+        timeout is seconds into the future, not a "deadline" in Unix timestamp
+        as in Tornado. callback(*timeout_args) is executed after the timeout.
+        Waiters are only ever executed once.
+        """
+        _check_callback(callback)
+        if timeout is not None:
+            io_loop.add_timeout(time.time() + timeout, self.run)
         self.callback = callback
 
     def run(self, *args, **kwargs):
         if self.callback:
             callback, self.callback = self.callback, None
             callback(*args, **kwargs)
+
+    @property
+    def expired(self):
+        return not self.callback
 
 
 # TODO: copy Gevent's docs and tests for this
@@ -52,6 +77,7 @@ class AsyncResult(object):
 
     def get(self, callback):
         if self.ready():
+            _check_callback(callback)
             self.io_loop.add_callback(partial(callback, self.value))
         else:
             self.callback = callback
@@ -65,7 +91,7 @@ class Condition(object):
 
     def _consume_timed_out_waiters(self):
         # Delete waiters at the head of the queue who've timed out
-        while self.waiters and not self.waiters[0].callback:
+        while self.waiters and self.waiters[0].expired:
             self.waiters.popleft()
 
     def wait(self, timeout=None, callback=None):
@@ -74,23 +100,12 @@ class Condition(object):
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
         #   with threading.Condition
-        if not callable(callback):
-            raise TypeError(
-                "callback must be callable, not %s" % repr(callback))
-
-        if timeout is not None:
-            waiter = _Waiter(time.time() + timeout, callback)
-            self.io_loop.add_timeout(waiter.timeout, waiter.run)
-        else:
-            waiter = _Waiter(None, callback)
-
-        self.waiters.append(waiter)
+        self.waiters.append(
+            _Waiter(timeout, (), self.io_loop, callback))
 
     def notify(self, n=1, callback=None):
         self._consume_timed_out_waiters()
         waiters = [] # Waiters we plan to run right now
-
-        # TODO: more elegant version w/ slicing?
         while n and self.waiters:
             waiter = self.waiters.popleft()
             n -= 1
@@ -101,15 +116,12 @@ class Condition(object):
             waiter.run() # TODO: what if this throws?
 
         if callback:
+            _check_callback(callback)
             self.io_loop.add_callback(callback)
 
     def notify_all(self, callback):
         self.notify(len(self.waiters), callback)
 
-# TODO: remove
-#    def pop_waiter(self):
-#        self._consume_timed_out_waiters()
-#        return self.waiters.popleft()
 
 # TODO: tests! copy from Gevent.Event tests?
 class Event(object):
@@ -165,15 +177,11 @@ class Event(object):
         Return the value of the internal flag (``True`` or ``False``).
         """
         if self._flag:
+            _check_callback(callback)
             self.io_loop.add_callback(callback)
         else:
-            # TODO: obviously needs to be factored into _Waiter()
-            if timeout is not None:
-                waiter = _Waiter(time.time() + timeout, callback)
-                self.io_loop.add_timeout(waiter.timeout, partial(waiter.run, False))
-            else:
-                waiter = _Waiter(timeout, callback)
-            self._links.append(waiter)
+            self._links.append(
+                _Waiter(timeout, (False,), self.io_loop, callback))
 
     # TODO
     def rawlink(self, callback):
@@ -182,8 +190,6 @@ class Event(object):
         *callback* will be called in the :class:`Hub <gevent.hub.Hub>`, so it must not use blocking gevent API.
         *callback* will be passed one argument: this instance.
         """
-        if not callable(callback):
-            raise TypeError('Expected callable: %r' % (callback, ))
         self._links.append(callback)
         if self._flag:
             core.active_event(self._notify_links, list(self._links))  # XXX just pass [callback]
@@ -289,6 +295,7 @@ class Queue(object):
         #   test whether we'll block?
         # TODO: negative maxsize?
         # TODO: require callback, right? what does block mean anyway?
+
         self._consume_expired_getters()
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
@@ -298,25 +305,23 @@ class Queue(object):
             self._put(item)
             getter.run(self._get()) # TODO: exception?
             if callback:
+                _check_callback(callback)
                 self.io_loop.add_callback(partial(callback, True))
         elif self.maxsize == self.qsize() and callback:
+            _check_callback(callback)
+
+            # TODO: huh?
             def _callback(success):
-#                if success:
-#                    # Didn't time out
-#                    self._put(item)
                 self.io_loop.add_callback(partial(callback, success))
 
-            if timeout is not None:
-                waiter = _Waiter(time.time() + timeout, _callback)
-                self.io_loop.add_timeout(waiter.timeout, partial(waiter.run, False))
-            else:
-                waiter = _Waiter(timeout, _callback)
+            waiter = _Waiter(timeout, (False,), self.io_loop, _callback)
             self.putters.append((item, waiter))
         elif self.maxsize == self.qsize():
             raise Full
         else:
             self._put(item)
             if callback:
+                _check_callback(callback)
                 self.io_loop.add_callback(partial(callback, True))
 
     def get(self, callback=None, timeout=None):
@@ -349,13 +354,9 @@ class Queue(object):
             else:
                 return self._get()
         elif callback:
-            if timeout is not None:
-                waiter = _Waiter(time.time() + timeout, callback)
-                # TODO: is passing Empty to callback the right way to express timeout?
-                self.io_loop.add_timeout(waiter.timeout, partial(waiter.run, Empty))
-            else:
-                waiter = _Waiter(timeout, callback)
-            self.getters.append(waiter)
+            # TODO: is passing Empty to callback the right way to express timeout?
+            self.getters.append(
+                _Waiter(timeout, (Empty,), self.io_loop, callback))
         else:
             raise Empty
 
@@ -435,6 +436,7 @@ class JoinableQueue(Queue):
         unfinished tasks drops to zero, :meth:`join` unblocks.
         '''
         if self.unfinished_tasks == 0:
+            _check_callback(callback)
             self.io_loop.add_callback(callback)
         else:
             self._cond.wait(callback)
