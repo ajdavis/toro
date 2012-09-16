@@ -1,8 +1,11 @@
 # TODO: check against API at http://www.gevent.org/gevent.queue.html#module-gevent.queue
 #   and emulate the example at its bottom in my docs
 # TODO: doc! mostly copy Gevent's
+# TODO: note that altering maxsize doesn't unlock putters as it should
 # TODO: check on Gevent's licensing
+# TODO: review reprs and __str__'s
 import heapq
+import logging
 import time
 import collections
 from functools import partial
@@ -32,7 +35,29 @@ def _check_callback(callback):
             "callback must be callable, not %s" % repr(callback))
 
 
-class _Waiter(object):
+class ToroBase(object):
+    def _run_callback(self, callback, *args, **kwargs):
+        try:
+            callback(*args, **kwargs)
+        except Exception:
+            self.handle_callback_exception(callback)
+
+    def handle_callback_exception(self, callback):
+        """This method is called whenever a callback run Toro throws an
+        exception.
+
+        By default simply logs the exception as an error.  Subclasses
+        may override this method to customize reporting of exceptions.
+
+        The exception itself is not passed explicitly, but is available
+        in sys.exc_info.
+
+        Copied from IOLoop.
+        """
+        logging.error("Exception in callback %r", callback, exc_info=True)
+
+
+class _Waiter(ToroBase):
     """Internal Toro utility class"""
     def __init__(self, timeout, timeout_args, io_loop, callback):
         """
@@ -51,7 +76,7 @@ class _Waiter(object):
     def run(self, *args, **kwargs):
         if self.callback:
             callback, self.callback = self.callback, None
-            callback(*args, **kwargs)
+            self._run_callback(callback, *args, **kwargs)
 
     @property
     def expired(self):
@@ -59,7 +84,7 @@ class _Waiter(object):
 
 
 # TODO: copy Gevent's docs and tests for this
-class AsyncResult(object):
+class AsyncResult(ToroBase):
     def __init__(self, io_loop=None):
         self.io_loop = io_loop or IOLoop.instance()
         self._ready = False
@@ -71,7 +96,7 @@ class AsyncResult(object):
         self._ready = True
         if self.callback:
             callback, self.callback = self.callback, None
-            callback(self.value)
+            self._run_callback(callback, self.value)
 
     def ready(self):
         return self._ready
@@ -85,7 +110,7 @@ class AsyncResult(object):
 
 
 # TODO: Note we don't have or need acquire() and release()
-class Condition(object):
+class Condition(ToroBase):
     def __init__(self, io_loop=None):
         self.waiters = collections.deque([]) # Queue of _Waiter objects
         self.io_loop = io_loop or IOLoop.instance()
@@ -113,7 +138,7 @@ class Condition(object):
             self._consume_timed_out_waiters()
 
         for waiter in waiters:
-            waiter.run() # TODO: what if this throws?
+            waiter.run()
 
         if callback:
             _check_callback(callback)
@@ -124,7 +149,7 @@ class Condition(object):
 
 
 # TODO: tests! copy from Gevent.Event tests?
-class Event(object):
+class Event(ToroBase):
     """A synchronization primitive that allows one greenlet to wake up one or more others.
     It has the same interface as :class:`threading.Event` but works across greenlets.
 
@@ -155,7 +180,7 @@ class Event(object):
         self._flag = True
         links, self._links = self._links, []
         for waiter in links:
-            waiter.run() # TODO: exceptions!
+            waiter.run()
 
     def clear(self):
         """Reset the internal flag to false.
@@ -217,7 +242,7 @@ class Event(object):
                         traceback.print_exc()
 
 
-class Queue(object):
+class Queue(ToroBase):
     def __init__(self, maxsize=None, io_loop=None):
         self.io_loop = io_loop or IOLoop.instance()
         self.maxsize = maxsize
@@ -291,11 +316,7 @@ class Queue(object):
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
         #   with Queue.Queue and Gevent's Queue
-        # TODO: how much could API be simplified, knowing we can reliably
-        #   test whether we'll block?
         # TODO: negative maxsize?
-        # TODO: require callback, right? what does block mean anyway?
-
         self._consume_expired_getters()
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
@@ -303,7 +324,7 @@ class Queue(object):
 
             # Call _put and _get in case subclasses have special logic for them
             self._put(item)
-            getter.run(self._get()) # TODO: exception?
+            getter.run(self._get())
             if callback:
                 _check_callback(callback)
                 self.io_loop.add_callback(partial(callback, True))
@@ -346,18 +367,17 @@ class Queue(object):
             item, putter = self.putters.popleft()
             self._put(item)
             if callback:
-                callback(self._get())
+                self._run_callback(callback, self._get())
                 putter.run(True)
             else:
                 self.io_loop.add_callback(partial(putter.run, True))
                 return self._get()
         elif self.qsize():
             if callback:
-                callback(self._get())
+                self._run_callback(callback, self._get())
             else:
                 return self._get()
         elif callback:
-            # TODO: is passing Empty to callback the right way to express timeout?
             self.getters.append(
                 _Waiter(timeout, (Empty,), self.io_loop, callback))
         else:
@@ -450,15 +470,15 @@ class JoinableQueue(Queue):
 
 
 # TODO
-class Semaphore(object):
+class Semaphore(ToroBase):
     pass
 
 
 # TODO
-class BoundedSemaphore(object):
+class BoundedSemaphore(ToroBase):
     pass
 
 
 # TODO
-class RLock(object):
+class RLock(ToroBase):
     pass

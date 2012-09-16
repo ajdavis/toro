@@ -333,11 +333,6 @@ class TestQueue2(unittest.TestCase):
     # Gevent's test_two_bogus_waiters isn't relevant to Toro
     #def test_two_bogus_waiters(self):
 
-    # TODO: test timeouts
-    # TODO: test exception-throwing in callbacks
-    # TODO: test StackContext-handling
-    # TODO: test non-blocking puts and gets
-
 
 class TestChannel2(unittest.TestCase):
 
@@ -461,13 +456,127 @@ class TestJoinEmpty2(unittest.TestCase):
 
 
 # SECTION 3: Tests written specifically for Toro
-# TODO
+# TODO: test StackContext-handling
+
+def bad_get_callback(item):
+    raise Exception('Intentional exception in get callback')
+
+
+def bad_put_callback(success):
+    raise Exception('Intentional exception in put callback')
+
+
+class TestQueueTimeouts3(unittest.TestCase):
+    @async_test_engine()
+    def test_get_timeout(self):
+        q = toro.Queue()
+
+        # Empty Queue returns Empty if get() times out
+        st = time.time()
+        self.assertEqual(Empty, (yield Task(q.get, timeout=.1)))
+        duration = time.time() - st
+        self.assertAlmostEqual(.1, duration, places=2)
+
+        # Make sure that putting and getting a value returns Queue to initial
+        # state
+        q.put(1)
+        self.assertEqual(1, (yield Task(q.get, timeout=.1)))
+
+        # Queue *still* returns Empty if get() times out
+        st = time.time()
+        self.assertEqual(Empty, (yield Task(q.get, timeout=.1)))
+        duration = time.time() - st
+        self.assertAlmostEqual(.1, duration, places=2)
+
+    @async_test_engine()
+    def test_put_timeout(self):
+        q = toro.Queue(1)
+        q.put(1)
+
+        # Full Queue returns False if put() times out
+        st = time.time()
+        self.assertEqual(False, (yield Task(q.put, 2, timeout=.1)))
+        duration = time.time() - st
+        self.assertAlmostEqual(.1, duration, places=2)
+
+        # Make sure that getting and putting a value returns Queue to initial
+        # state
+        self.assertEqual(1, q.get())
+        self.assertEqual(True, (yield Task(q.put, 1, timeout=.1)))
+
+        # Full Queue *still* returns False if put() times out
+        st = time.time()
+        self.assertEqual(False, (yield Task(q.put, 2, timeout=.1)))
+        duration = time.time() - st
+        self.assertAlmostEqual(.1, duration, places=2)
+
+
+class TestQueueCallbackExceptions3(unittest.TestCase):
+    """
+    Test what happens when callbacks passed to get() or put() raise
+    exceptions
+    """
+    @gen.engine
+    def _test_exceptional_get_callback(self, qsize, timeout, callback):
+        q = toro.Queue(qsize)
+        while q.qsize() < qsize:
+            q.put(None)
+
+        q.put(1, callback=(yield gen.Callback('put')), timeout=timeout) # Block
+        q.get(bad_get_callback)
+
+        # Put should complete anyway
+        self.assertTrue((yield gen.Wait('put')))
+        self.assertEqual(qsize, q.qsize())
+        callback()
+
+    @gen.engine
+    def _test_exceptional_put_callback(self, qsize, timeout, callback):
+        q = toro.Queue(qsize)
+        q.get(callback=(yield gen.Callback('get')), timeout=timeout) # Block
+        q.put(1, bad_put_callback)
+
+        # Get should complete anyway
+        self.assertEqual(1, (yield gen.Wait('get')))
+        self.assertEqual(0, q.qsize())
+        callback()
+
+    @async_test_engine()
+    def test_exceptional_get_callback(self):
+        yield Task(self._test_exceptional_get_callback, 10, None)
+
+    @async_test_engine()
+    def test_exceptional_get_callback_timeout(self):
+        yield Task(self._test_exceptional_get_callback, 10, .1)
+
+    @async_test_engine()
+    def test_channel_exceptional_get_callback(self):
+        yield Task(self._test_exceptional_get_callback, 0, None)
+
+    @async_test_engine()
+    def test_channel_exceptional_get_callback_timeout(self):
+        yield Task(self._test_exceptional_get_callback, 0, .1)
+
+    @async_test_engine()
+    def test_exceptional_put_callback(self):
+        yield Task(self._test_exceptional_put_callback, 10, None)
+
+    @async_test_engine()
+    def test_exceptional_put_callback_timeout(self):
+        yield Task(self._test_exceptional_put_callback, 10, .1)
+
+    @async_test_engine()
+    def test_channel_exceptional_put_callback(self):
+        yield Task(self._test_exceptional_put_callback, 0, None)
+
+    @async_test_engine()
+    def test_channel_exceptional_put_callback_timeout(self):
+        yield Task(self._test_exceptional_put_callback, 0, .1)
+
 
 class TestJoinableQueue3(unittest.TestCase):
     @async_test_engine()
     def test_queue_join_timeout(self):
-        # Test that a queue join()s successfully, and before anything else
-        # (done twice for insurance).
         q = toro.JoinableQueue()
         q.put(1)
         st = time.time()
