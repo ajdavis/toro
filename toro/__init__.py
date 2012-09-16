@@ -44,7 +44,8 @@ class _Waiter(object):
         """
         _check_callback(callback)
         if timeout is not None:
-            io_loop.add_timeout(time.time() + timeout, self.run)
+            io_loop.add_timeout(
+                time.time() + timeout, partial(self.run, *timeout_args))
         self.callback = callback
 
     def run(self, *args, **kwargs):
