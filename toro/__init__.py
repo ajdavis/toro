@@ -10,6 +10,7 @@ import time
 import collections
 from functools import partial
 from Queue import Full, Empty
+from tornado import stack_context
 
 from tornado.ioloop import IOLoop
 
@@ -18,9 +19,23 @@ from tornado.ioloop import IOLoop
 # TODO: move into a file per class
 
 __all__ = [
-    'Event', 'Condition', 'Empty', 'Full', 'Queue', 'PriorityQueue',
-    'LifoQueue'
+    # Exceptions
+    'NotReady', 'AlreadySet',
+
+    # Classes
+    'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
+
+    # Queue classes
+    'Queue', 'PriorityQueue', 'LifoQueue', 'JoinableQueue'
 ]
+
+
+class NotReady(Exception):
+    pass
+
+
+class AlreadySet(Exception):
+    pass
 
 
 def _check_callback(callback):
@@ -36,6 +51,9 @@ def _check_callback(callback):
 
 
 class ToroBase(object):
+    def __init__(self, io_loop):
+        self.io_loop = io_loop or IOLoop.instance()
+    
     def _run_callback(self, callback, *args, **kwargs):
         try:
             callback(*args, **kwargs)
@@ -52,7 +70,7 @@ class ToroBase(object):
         The exception itself is not passed explicitly, but is available
         in sys.exc_info.
 
-        Copied from IOLoop.
+        Copied from IOLoop's implementation.
         """
         logging.error("Exception in callback %r", callback, exc_info=True)
 
@@ -67,11 +85,12 @@ class _Waiter(ToroBase):
         as in Tornado. callback(*timeout_args) is executed after the timeout.
         Waiters are only ever executed once.
         """
+        super(_Waiter, self).__init__(io_loop)
         _check_callback(callback)
         if timeout is not None:
-            io_loop.add_timeout(
+            self.io_loop.add_timeout(
                 time.time() + timeout, partial(self.run, *timeout_args))
-        self.callback = callback
+        self.callback = stack_context.wrap(callback)
 
     def run(self, *args, **kwargs):
         if self.callback:
@@ -83,37 +102,64 @@ class _Waiter(ToroBase):
         return not self.callback
 
 
-# TODO: copy Gevent's docs and tests for this
 class AsyncResult(ToroBase):
+    """A one-time event that stores a value or an exception.
+
+    Like :class:`Event` it wakes up all the waiters when :meth:`set`
+    is called. Waiters may receive the passed value by calling :meth:`get`
+    method instead of :meth:`wait`. An :class:`AsyncResult` instance cannot be
+    reset.
+
+    To pass a value call :meth:`set`. Calls to :meth:`get` (those currently
+    blocking as well as those made in the future) will return the value:
+
+        >>> result = AsyncResult()
+        >>> result.set(100)
+        >>> result.get()
+        100
+    """
     def __init__(self, io_loop=None):
-        self.io_loop = io_loop or IOLoop.instance()
+        super(AsyncResult, self).__init__(io_loop)
         self._ready = False
         self.value = None
-        self.callback = None
+        self.waiters = []
 
     def set(self, value):
+        if self._ready:
+            raise AlreadySet
+
         self.value = value
         self._ready = True
-        if self.callback:
-            callback, self.callback = self.callback, None
-            self._run_callback(callback, self.value)
+        waiters, self.waiters = self.waiters, []
+        for waiter in waiters:
+            waiter.run(value)
 
     def ready(self):
         return self._ready
 
-    def get(self, callback):
+    def get(self, callback=None, timeout=None):
+        """TODO: doc"""
         if self.ready():
+            if not callback:
+                # Non-blocking get
+                return self.value
+
             _check_callback(callback)
             self.io_loop.add_callback(partial(callback, self.value))
         else:
-            self.callback = callback
+            if not callback:
+                raise NotReady
+
+            # After timeout, callback will be passed None
+            self.waiters.append(
+                _Waiter(timeout, (None,), self.io_loop, callback))
 
 
 # TODO: Note we don't have or need acquire() and release()
 class Condition(ToroBase):
     def __init__(self, io_loop=None):
+        super(Condition, self).__init__(io_loop)
         self.waiters = collections.deque([]) # Queue of _Waiter objects
-        self.io_loop = io_loop or IOLoop.instance()
 
     def _consume_timed_out_waiters(self):
         # Delete waiters at the head of the queue who've timed out
@@ -121,7 +167,6 @@ class Condition(ToroBase):
             self.waiters.popleft()
 
     def wait(self, callback=None, timeout=None):
-        # TODO: True / False argument, called by notify() or timeout?
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
         #   with threading.Condition
@@ -148,19 +193,18 @@ class Condition(ToroBase):
         self.notify(len(self.waiters), callback)
 
 
-# TODO: tests! copy from Gevent.Event tests?
 class Event(ToroBase):
-    """A synchronization primitive that allows one greenlet to wake up one or more others.
-    It has the same interface as :class:`threading.Event` but works across greenlets.
+    """A synchronization primitive that allows one task to wake up one or more others.
+    It has a similar interface as :class:`threading.Event`.
 
-    An event object manages an internal flag that can be set to true with the
+    An Event object manages an internal flag that can be set to true with the
     :meth:`set` method and reset to false with the :meth:`clear` method. The :meth:`wait` method
     blocks until the flag is true.
     """
 
     def __init__(self, io_loop=None):
-        self.io_loop = io_loop or IOLoop.instance()
-        self._links = []
+        super(Event, self).__init__(io_loop)
+        self._waiters = []
         self._flag = False
 
     def __str__(self):
@@ -171,14 +215,14 @@ class Event(ToroBase):
         return self._flag
 
     isSet = is_set  # makes it a better drop-in replacement for threading.Event
-    ready = is_set  # makes it compatible with AsyncResult and Greenlet (for example in wait())
+    ready = is_set  # makes it compatible with AsyncResult
 
     def set(self):
-        """Set the internal flag to true. All greenlets waiting for it to become true are awakened.
+        """Set the internal flag to true. All waiters are awakened.
         Greenlets that call :meth:`wait` once the flag is true will not block at all.
         """
         self._flag = True
-        links, self._links = self._links, []
+        links, self._waiters = self._waiters, []
         for waiter in links:
             waiter.run()
 
@@ -205,46 +249,13 @@ class Event(ToroBase):
             _check_callback(callback)
             self.io_loop.add_callback(callback)
         else:
-            self._links.append(
+            self._waiters.append(
                 _Waiter(timeout, (False,), self.io_loop, callback))
-
-    # TODO
-    def rawlink(self, callback):
-        """Register a callback to call when the internal flag is set to true.
-
-        *callback* will be called in the :class:`Hub <gevent.hub.Hub>`, so it must not use blocking gevent API.
-        *callback* will be passed one argument: this instance.
-        """
-        self._links.append(callback)
-        if self._flag:
-            core.active_event(self._notify_links, list(self._links))  # XXX just pass [callback]
-
-    # TODO
-    def unlink(self, callback):
-        """Remove the callback set by :meth:`rawlink`"""
-        try:
-            self._links.remove(callback)
-        except ValueError:
-            pass
-
-    # TODO
-    def _notify_links(self, links):
-        assert getcurrent() is get_hub()
-        for link in links:
-            if link in self._links:  # check that link was not notified yet and was not removed by the client
-                try:
-                    link(self)
-                except:
-                    traceback.print_exc()
-                    try:
-                        sys.stderr.write('Failed to notify link %r of %r\n\n' % (link, self))
-                    except:
-                        traceback.print_exc()
 
 
 class Queue(ToroBase):
     def __init__(self, maxsize=None, io_loop=None):
-        self.io_loop = io_loop or IOLoop.instance()
+        super(Queue, self).__init__(io_loop)
         self.maxsize = maxsize
 
         # _Waiters
@@ -385,7 +396,8 @@ class Queue(ToroBase):
 
 
 class PriorityQueue(Queue):
-    """A subclass of :class:`Queue` that retrieves entries in priority order (lowest first).
+    """A subclass of :class:`Queue` that retrieves entries in priority order
+    (lowest first).
 
     Entries are typically tuples of the form: ``(priority number, data)``.
     """
@@ -401,7 +413,8 @@ class PriorityQueue(Queue):
 
 
 class LifoQueue(Queue):
-    '''A subclass of :class:`Queue` that retrieves most recently added entries first.'''
+    """A subclass of :class:`Queue` that retrieves most recently added entries
+    first."""
 
     def _init(self, maxsize):
         self.queue = []
@@ -414,10 +427,11 @@ class LifoQueue(Queue):
 
 
 class JoinableQueue(Queue):
-    '''A subclass of :class:`Queue` that additionally has :meth:`task_done` and :meth:`join` methods.'''
+    """A subclass of :class:`Queue` that additionally has :meth:`task_done` and
+    :meth:`join` methods."""
 
-    def __init__(self, maxsize=None):
-        Queue.__init__(self, maxsize)
+    def __init__(self, maxsize=None, io_loop=None):
+        Queue.__init__(self, maxsize, io_loop)
         self.unfinished_tasks = 0
         self._cond = Event()
         self._cond.set()
@@ -434,7 +448,7 @@ class JoinableQueue(Queue):
         self._cond.clear()
 
     def task_done(self):
-        '''Indicate that a formerly enqueued task is complete. Used by queue consumer threads.
+        """Indicate that a formerly enqueued task is complete. Used by queue consumer threads.
         For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to :meth:`task_done` tells the queue
         that the processing on the task is complete.
 
@@ -443,7 +457,7 @@ class JoinableQueue(Queue):
         :meth:`put <Queue.put>` into the queue).
 
         Raises a :exc:`ValueError` if called more times than there were items placed in the queue.
-        '''
+        """
         if self.unfinished_tasks <= 0:
             raise ValueError('task_done() called too many times')
         self.unfinished_tasks -= 1
@@ -451,7 +465,7 @@ class JoinableQueue(Queue):
             self._cond.set()
 
     def join(self, callback, timeout=None):
-        '''Block until all items in the queue have been gotten and processed.
+        """Block until all items in the queue have been gotten and processed.
 
         The count of unfinished tasks goes up whenever an item is added to the queue.
         The count goes down whenever a consumer thread calls :meth:`task_done` to indicate
@@ -461,7 +475,7 @@ class JoinableQueue(Queue):
         If timeout is not None, the callback may be executed before all tasks
         are complete. Check the value of unfinished_tasks after a join() with a
         timeout to determine if this has happened.
-        '''
+        """
         if self.unfinished_tasks == 0:
             _check_callback(callback)
             self.io_loop.add_callback(callback)

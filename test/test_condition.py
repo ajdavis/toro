@@ -17,14 +17,15 @@ def make_callback(key, history):
 
 class TestCondition(unittest.TestCase):
     @async_test_engine()
-    def test_notify(self):
+    def test_notify(self, done):
         loop = IOLoop.instance()
         c = toro.Condition()
         loop.add_timeout(time.time() + .1, c.notify)
         yield gen.Task(c.wait)
+        done()
 
     @async_test_engine()
-    def test_notify_n(self):
+    def test_notify_n(self, done):
         c = toro.Condition()
         history = []
         for i in range(6):
@@ -38,9 +39,10 @@ class TestCondition(unittest.TestCase):
         self.assertEqual(list(range(4)), history)
         yield gen.Task(c.notify, 2)
         self.assertEqual(list(range(6)), history)
+        done()
 
     @async_test_engine()
-    def test_notify_all(self):
+    def test_notify_all(self, done):
         c = toro.Condition()
         history = []
         for i in range(4):
@@ -50,18 +52,19 @@ class TestCondition(unittest.TestCase):
 
         # Callbacks execute in the order they were registered
         self.assertEqual(list(range(4)), history)
+        done()
 
     @async_test_engine()
-    def test_wait_timeout(self):
+    def test_wait_timeout(self, done):
         c = toro.Condition()
         st = time.time()
         yield gen.Task(c.wait, timeout=.1)
         duration = time.time() - st
         self.assertAlmostEqual(.1, duration, places=2)
+        done()
 
-    # TODO: test timeout returns True / False
     @async_test_engine()
-    def test_wait_timeout_preempted(self):
+    def test_wait_timeout_preempted(self, done):
         loop = IOLoop.instance()
         c = toro.Condition()
         st = time.time()
@@ -73,9 +76,10 @@ class TestCondition(unittest.TestCase):
 
         # Verify we were awakened by c.notify(), not by timeout
         self.assertAlmostEqual(.1, duration, places=2)
+        done()
 
     @async_test_engine()
-    def test_notify_n_with_timeout(self):
+    def test_notify_n_with_timeout(self, done):
         # Register callbacks 0, 1, 2, and 3. Callback 1 has a timeout.
         # Wait for that timeout to expire, then do notify(2) and make
         # sure everyone runs. Verifies that a timed-out callback does
@@ -98,9 +102,10 @@ class TestCondition(unittest.TestCase):
         self.assertEqual([1, 0, 2], history)
         yield gen.Task(c.notify)
         self.assertEqual([1, 0, 2, 3], history)
+        done()
 
     @async_test_engine()
-    def test_notify_all_with_timeout(self):
+    def test_notify_all_with_timeout(self, done):
         loop = IOLoop.instance()
         c = toro.Condition()
         st = time.time()
@@ -116,3 +121,4 @@ class TestCondition(unittest.TestCase):
 
         yield gen.Task(c.notify_all)
         self.assertEqual([1, 0, 2], history)
+        done()

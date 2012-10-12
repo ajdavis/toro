@@ -29,6 +29,7 @@ or:
         repr(timeout_sec)))
 
     timeout_sec = max(timeout_sec, float(os.environ.get('TIMEOUT_SEC', 0)))
+    is_done = [False]
 
     def decorator(func):
         class AsyncTestRunner(gen.Runner):
@@ -52,6 +53,9 @@ or:
                     loop.remove_timeout(self.timeout)
                     loop.stop()
 
+        def done():
+            is_done[0] = True
+
         @functools.wraps(func)
         def _async_test(self):
             # Uninstall previous loop
@@ -67,19 +71,18 @@ or:
 
             timeout = loop.add_timeout(time.time() + timeout_sec, on_timeout)
 
-            gen = func(self)
-            assert isinstance(gen, types.GeneratorType), (
-                "%s should be a generator, include a yield "
-                "statement" % func
-            )
+            gen = func(self, done)
+            if isinstance(gen, types.GeneratorType):
+                runner = AsyncTestRunner(gen, timeout)
+                runner.run()
+                loop.start()
+                if not runner.finished:
+                    # Something stopped the loop before func could finish or throw
+                    # an exception.
+                    raise Exception('%s did not finish' % func)
 
-            runner = AsyncTestRunner(gen, timeout)
-            runner.run()
-            loop.start()
-            if not runner.finished:
-                # Something stopped the loop before func could finish or throw
-                # an exception.
-                raise Exception('%s did not finish' % func)
+            if not is_done[0]:
+                raise Exception('%s did not call done()' % func)
 
         return _async_test
     return decorator
