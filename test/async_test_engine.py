@@ -76,6 +76,9 @@ or:
                 runner = AsyncTestRunner(gen, timeout)
                 runner.run()
                 loop.start()
+
+                del ioloop.IOLoop._instance # Uninstall
+
                 if not runner.finished:
                     # Something stopped the loop before func could finish or throw
                     # an exception.

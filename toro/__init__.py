@@ -256,6 +256,8 @@ class Event(ToroBase):
 class Queue(ToroBase):
     def __init__(self, maxsize=None, io_loop=None):
         super(Queue, self).__init__(io_loop)
+        if maxsize is not None and maxsize < 0:
+            raise ValueError("maxsize can't be negative")
         self.maxsize = maxsize
 
         # _Waiters
@@ -327,7 +329,6 @@ class Queue(ToroBase):
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
         #   with Queue.Queue and Gevent's Queue
-        # TODO: negative maxsize?
         self._consume_expired_getters()
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
