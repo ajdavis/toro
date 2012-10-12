@@ -456,7 +456,7 @@ class JoinableQueue(Queue):
         self._cond.clear()
 
     def task_done(self):
-        """Indicate that a formerly enqueued task is complete. Used by queue consumer threads.
+        """Indicate that a formerly enqueued task is complete. Used by queue consumers.
         For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to :meth:`task_done` tells the queue
         that the processing on the task is complete.
 

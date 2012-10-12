@@ -680,6 +680,22 @@ class TestJoinableQueue3(unittest.TestCase):
         self.assertTrue('tasks' in str(q))
 
     @async_test_engine()
+    def test_queue_join(self, done):
+        q = toro.JoinableQueue()
+        q.put('foo')
+        q.put('bar')
+        self.assertEqual(2, q.unfinished_tasks)
+        q.join(callback=(yield gen.Callback('join')))
+
+        q.task_done()
+        self.assertEqual(1, q.unfinished_tasks)
+        q.task_done()
+        self.assertEqual(0, q.unfinished_tasks)
+
+        yield gen.Wait('join')
+        done()
+
+    @async_test_engine()
     def test_queue_join_timeout(self, done):
         q = toro.JoinableQueue()
         q.put(1)
