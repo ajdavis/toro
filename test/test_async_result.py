@@ -17,6 +17,12 @@ from test.async_test_engine import async_test_engine
 
 
 class TestAsyncResult(unittest.TestCase):
+    def test_str(self):
+        result = toro.AsyncResult()
+        str(result)
+        result.set('fizzle')
+        self.assertTrue('fizzle' in str(result))
+
     def test_get_nowait(self):
         # Without a callback, get() is non-blocking. 'timeout' is ignored.
         self.assertRaises(toro.NotReady, toro.AsyncResult().get)

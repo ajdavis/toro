@@ -15,6 +15,14 @@ def make_callback(key, history):
 
 
 class TestEvent(unittest.TestCase):
+    def test_str(self):
+        event = toro.Event()
+        self.assertTrue('clear' in str(event))
+        self.assertFalse('set' in str(event))
+        event.set()
+        self.assertFalse('clear' in str(event))
+        self.assertTrue('set' in str(event))
+
     @gen.engine
     def test_event(self, n, callback):
         e = toro.Event()
@@ -81,3 +89,38 @@ class TestEvent(unittest.TestCase):
         self.assertTrue(outcomes['callback_executed'])
         self.assertEqual(outcomes['wait_result_exc'], AssertionError)
         self.assertEqual(outcomes['set_result_exc'], None)
+
+    @async_test_engine()
+    def test_event_timeout(self, done):
+        e = toro.Event()
+
+        st = time.time()
+        result = yield gen.Task(e.wait, timeout=.01)
+        duration = time.time() - st
+        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertEqual(None, result)
+
+        # After a timed-out waiter, normal operation works
+        IOLoop.instance().add_timeout(
+            time.time() + .01, e.set)
+
+        st = time.time()
+        result = yield gen.Task(e.wait, timeout=1)
+        duration = time.time() - st
+        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertEqual(None, result)
+        done()
+
+    @async_test_engine()
+    def test_event_nowait(self, done):
+        e = toro.Event()
+        e.set()
+        self.assertEqual(True, e.is_set())
+        self.assertEqual(True, e.isSet())
+        self.assertEqual(True, e.ready())
+        st = time.time()
+        result = yield gen.Task(e.wait, timeout=.01)
+        duration = time.time() - st
+        self.assertAlmostEqual(0, duration, places=2)
+        self.assertEqual(None, result)
+        done()

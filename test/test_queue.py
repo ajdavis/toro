@@ -479,8 +479,36 @@ def bad_put_callback(success):
 
 
 class TestQueue3(unittest.TestCase):
+    def test_str(self):
+        self.assertTrue('Queue' in str(toro.Queue()))
+        self.assertTrue('maxsize=11' in str(toro.Queue(11)))
+
+        q = toro.Queue(0)
+        for i in range(7):
+            q.get(callback=lambda value: None)
+        self.assertTrue('getters[7]' in str(q))
+
+        q = toro.Queue(0)
+        for i in range(5):
+            q.put('foo', callback=lambda value: None)
+        self.assertTrue('putters[5]' in str(q))
+
+        q = toro.Queue(1)
+        self.assertFalse('queue=' in str(q))
+        q.put('foo')
+        self.assertTrue('queue=' in str(q))
+
     def test_maxsize(self):
         self.assertRaises(ValueError, toro.Queue, -1)
+
+    def test_full(self):
+        self.assertTrue(toro.Queue(0).full())
+        self.assertFalse(toro.Queue().full())
+
+        q = toro.Queue(1)
+        self.assertFalse(q.full())
+        q.put('foo')
+        self.assertTrue(q.full())
 
     def test_callback_checking(self):
         self.assertRaises(TypeError, toro.Queue().get, callback='foo')
@@ -644,6 +672,13 @@ class TestQueueCallbackExceptions3(unittest.TestCase):
 
 
 class TestJoinableQueue3(unittest.TestCase):
+    def test_str(self):
+        q = toro.JoinableQueue()
+        self.assertTrue('JoinableQueue' in str(q))
+        self.assertFalse('tasks' in str(q))
+        q.put('foo')
+        self.assertTrue('tasks' in str(q))
+
     @async_test_engine()
     def test_queue_join_timeout(self, done):
         q = toro.JoinableQueue()

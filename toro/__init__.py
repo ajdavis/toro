@@ -4,6 +4,7 @@
 # TODO: note that altering maxsize doesn't unlock putters as it should
 # TODO: check on Gevent's licensing
 # TODO: review reprs and __str__'s
+# TODO: test custom ioloop handling
 import heapq
 import logging
 import time
@@ -124,6 +125,14 @@ class AsyncResult(ToroBase):
         self.value = None
         self.waiters = []
 
+    def __str__(self):
+        result = '<%s ' % (self.__class__.__name__, )
+        if self._ready:
+            result += 'value=%r' % self.value
+        else:
+            result += 'unset'
+        return result + '>'
+
     def set(self, value):
         if self._ready:
             raise AlreadySet
@@ -236,21 +245,19 @@ class Event(ToroBase):
     def wait(self, callback, timeout=None):
         """Block until the internal flag is true.
         If the internal flag is true on entry, return immediately. Otherwise,
-        block until another thread calls :meth:`set` to set the flag to true,
+        block until another task calls :meth:`set` to set the flag to true,
         or until the optional timeout occurs.
 
         When the *timeout* argument is present and not ``None``, it should be a
         floating point number specifying a timeout for the operation in seconds
         (or fractions thereof).
-
-        Return the value of the internal flag (``True`` or ``False``).
         """
         if self._flag:
             _check_callback(callback)
             self.io_loop.add_callback(callback)
         else:
             self._waiters.append(
-                _Waiter(timeout, (False,), self.io_loop, callback))
+                _Waiter(timeout, (), self.io_loop, callback))
 
 
 class Queue(ToroBase):
@@ -276,11 +283,11 @@ class Queue(ToroBase):
         self.queue.append(item)
         
     def _consume_expired_getters(self):
-        while self.getters and not self.getters[0].callback:
+        while self.getters and self.getters[0].expired:
             self.getters.popleft()
 
     def _consume_expired_putters(self):
-        while self.putters and not self.putters[0][1].callback:
+        while self.putters and self.putters[0][1].expired:
             self.putters.popleft()
 
     def __repr__(self):
@@ -440,7 +447,7 @@ class JoinableQueue(Queue):
     def _format(self):
         result = Queue._format(self)
         if self.unfinished_tasks:
-            result += ' tasks=%s _cond=%s' % (self.unfinished_tasks, self._cond)
+            result += ' tasks=%s' % self.unfinished_tasks
         return result
 
     def _put(self, item):
