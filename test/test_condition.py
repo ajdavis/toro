@@ -133,3 +133,16 @@ class TestCondition(unittest.TestCase):
         yield gen.Task(c.notify_all)
         self.assertEqual([1, 0, 2], history)
         done()
+
+    def test_io_loop(self):
+        global_loop = IOLoop.instance()
+        custom_loop = IOLoop()
+        self.assertNotEqual(global_loop, custom_loop)
+        c = toro.Condition(custom_loop)
+
+        def callback():
+            custom_loop.stop()
+
+        c.wait(callback)
+        c.notify()
+        custom_loop.start()

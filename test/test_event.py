@@ -124,3 +124,16 @@ class TestEvent(unittest.TestCase):
         self.assertAlmostEqual(0, duration, places=2)
         self.assertEqual(None, result)
         done()
+
+    def test_io_loop(self):
+        global_loop = IOLoop.instance()
+        custom_loop = IOLoop()
+        self.assertNotEqual(global_loop, custom_loop)
+        e = toro.Event(custom_loop)
+
+        def callback():
+            custom_loop.stop()
+
+        e.wait(callback)
+        e.set()
+        custom_loop.start()

@@ -85,7 +85,7 @@ class LockTests2(unittest.TestCase):
         str(lock)
         lock.acquire()
         str(lock)
-        lock.acquire(lambda: None)
+        lock.acquire(lambda x: None)
         str(lock)
 
     @async_test_engine()
@@ -94,8 +94,23 @@ class LockTests2(unittest.TestCase):
         self.assertTrue(lock.acquire())
         self.assertTrue(lock.locked())
         st = time.time()
-        yield gen.Task(lock.acquire, timeout=.01)
+        result = yield gen.Task(lock.acquire, timeout=.01)
+        self.assertFalse(result)
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertTrue(lock.locked())
         done()
+
+    def test_io_loop(self):
+        global_loop = IOLoop.instance()
+        custom_loop = IOLoop()
+        self.assertNotEqual(global_loop, custom_loop)
+        lock = toro.Lock(custom_loop)
+        lock.acquire()
+
+        def callback(v):
+            custom_loop.stop()
+
+        lock.acquire(callback)
+        lock.release()
+        custom_loop.start()

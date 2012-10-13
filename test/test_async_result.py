@@ -131,3 +131,17 @@ class TestAsyncResult(unittest.TestCase):
         self.assertEqual(outcomes['value'], 'hello')
         self.assertEqual(outcomes['get_result_exc'], AssertionError)
         self.assertEqual(outcomes['set_result_exc'], None)
+
+    def test_io_loop(self):
+        global_loop = IOLoop.instance()
+        custom_loop = IOLoop()
+        self.assertNotEqual(global_loop, custom_loop)
+        result = toro.AsyncResult(custom_loop)
+
+        def callback(value):
+            assert value == 'foo'
+            custom_loop.stop()
+
+        result.get(callback)
+        result.set('foo')
+        custom_loop.start()

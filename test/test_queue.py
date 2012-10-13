@@ -514,6 +514,20 @@ class TestQueue3(unittest.TestCase):
         self.assertRaises(TypeError, toro.Queue().get, callback='foo')
         self.assertRaises(TypeError, toro.Queue().get, callback=1)
 
+    def test_io_loop(self):
+        global_loop = IOLoop.instance()
+        custom_loop = IOLoop()
+        self.assertNotEqual(global_loop, custom_loop)
+        q = toro.Queue(None, custom_loop)
+
+        def callback(v):
+            assert v == 'foo'
+            custom_loop.stop()
+
+        q.get(callback)
+        q.put('foo')
+        custom_loop.start()
+
 
 class TestQueueTimeouts3(unittest.TestCase):
     @async_test_engine()
@@ -705,3 +719,19 @@ class TestJoinableQueue3(unittest.TestCase):
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertEqual(1, q.unfinished_tasks)
         done()
+
+    def test_io_loop(self):
+        # JoinableQueue has additional IOLoop interaction because it
+        # has an internal Event
+        global_loop = IOLoop.instance()
+        custom_loop = IOLoop()
+        self.assertNotEqual(global_loop, custom_loop)
+        q = toro.JoinableQueue(None, custom_loop)
+
+        def callback():
+            custom_loop.stop()
+
+        q.put('foo')
+        q.join(callback)
+        q.task_done()
+        custom_loop.start()

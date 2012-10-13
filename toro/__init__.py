@@ -4,7 +4,6 @@
 # TODO: note that altering maxsize doesn't unlock putters as it should
 # TODO: check on Gevent's licensing
 # TODO: review reprs and __str__'s
-# TODO: test custom ioloop handling
 # TODO: did I omit Gevent tests from the 2.7/ dir?
 # TODO: for non-blocking wait() acquire() etc. that don't raise exceptions,
 #   warn vehemently that they won't block and you must check return value!
@@ -448,7 +447,7 @@ class JoinableQueue(Queue):
     def __init__(self, maxsize=None, io_loop=None):
         Queue.__init__(self, maxsize, io_loop)
         self.unfinished_tasks = 0
-        self._cond = Event()
+        self._cond = Event(io_loop)
         self._cond.set()
 
     def _format(self):
@@ -497,24 +496,23 @@ class JoinableQueue(Queue):
             self._cond.wait(callback, timeout)
 
 
-class Semaphore(ToroBase):
+class Semaphore(object):
     """A semaphore manages a counter representing the number of release() calls minus the number of acquire() calls,
     plus an initial value. The acquire() method blocks if necessary until it can return without making the counter
     negative.
 
     If not given, value defaults to 1."""
     def __init__(self, value=1, io_loop=None):
-        super(Semaphore, self).__init__(io_loop)
         if value < 0:
             raise ValueError("semaphore initial value must be >= 0")
 
         # The semaphore is implemented as a Queue with 'value' objects
         # TODO: init queue with sequence
-        self.q = Queue()
+        self.q = Queue(None, io_loop)
         for i in range(value):
             self.q.put(None)
 
-        self._unlocked = Event()
+        self._unlocked = Event(io_loop)
         if value:
             self._unlocked.set()
 
