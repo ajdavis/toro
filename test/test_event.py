@@ -1,3 +1,9 @@
+"""
+Test toro.Event.
+
+Adapted from Gevent's lock_tests.py.
+"""
+
 import unittest
 import time
 
@@ -6,12 +12,6 @@ from tornado.ioloop import IOLoop
 
 import toro
 from test.async_test_engine import async_test_engine
-
-
-def make_callback(key, history):
-    def callback():
-        history.append(key)
-    return callback
 
 
 class TestEvent(unittest.TestCase):

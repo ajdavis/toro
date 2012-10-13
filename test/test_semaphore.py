@@ -1,14 +1,14 @@
 """
 Test toro.Semaphore.
 
-Adapted from Gevent's lock_tests.py and test__semaphore.py
+Adapted from Gevent's lock_tests.py and test__semaphore.py.
 """
 
 import unittest
 import time
 import sys
 
-from tornado import gen, stack_context
+from tornado import gen
 from tornado.ioloop import IOLoop
 
 import toro

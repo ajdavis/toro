@@ -10,6 +10,7 @@
 #   warn vehemently that they won't block and you must check return value!
 # TODO: we may need to do serious thinking about exceptions and Tornado
 #   StackContexts and get some input from bdarnell
+# TODO: document dependencies: Lock -> Semaphore -> Condition, and so on
 
 import heapq
 import logging
@@ -520,12 +521,12 @@ class Semaphore(ToroBase):
         """True if :attr:`counter` is zero"""
         return self.counter <= 0
 
-    def release(self):
+    def release(self, callback=None):
         if self._condition.waiters:
-            self._condition.notify() # wake one waiter
+            self._condition.notify(1, callback) # wake one waiter
         else:
             self.counter += 1
-        self._locked_condition.notify_all()
+        self._locked_condition.notify_all(callback)
 
     def wait(self, callback, timeout=None):
         """Wait for :attr:`locked` to be False"""
@@ -557,12 +558,27 @@ class BoundedSemaphore(Semaphore):
         super(BoundedSemaphore, self).__init__(value, io_loop)
         self._initial_value = value
 
-    def release(self):
+    def release(self, callback=None):
         if self.counter >= self._initial_value:
             raise ValueError("Semaphore released too many times")
-        return super(BoundedSemaphore, self).release()
+        return super(BoundedSemaphore, self).release(callback)
 
 
-# TODO
-class RLock(ToroBase):
-    pass
+class Lock(object):
+    def __init__(self, io_loop=None):
+        self._block = Semaphore(1, io_loop)
+
+    def __str__(self):
+        return "<%s _block=%s>" % (
+            self.__class__.__name__,
+            self._block)
+
+    def acquire(self, callback=None, timeout=None):
+        return self._block.acquire(callback, timeout)
+
+    def release(self, callback=None):
+        self._block.release(callback)
+
+    def locked(self):
+        return self._block.locked()
+
