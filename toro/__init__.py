@@ -8,6 +8,8 @@
 # TODO: did I omit Gevent tests from the 2.7/ dir?
 # TODO: for non-blocking wait() acquire() etc. that don't raise exceptions,
 #   warn vehemently that they won't block and you must check return value!
+# TODO: we may need to do serious thinking about exceptions and Tornado
+#   StackContexts and get some input from bdarnell
 
 import heapq
 import logging
@@ -18,10 +20,6 @@ from Queue import Full, Empty
 from tornado import stack_context
 
 from tornado.ioloop import IOLoop
-
-# TODO: we may need to do serious thinking about exceptions and Tornado
-#   StackContexts and get some input from bdarnell
-# TODO: move into a file per class
 
 __all__ = [
     # Exceptions
