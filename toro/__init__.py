@@ -54,7 +54,12 @@ def _check_callback(callback):
 class ToroBase(object):
     def __init__(self, io_loop):
         self.io_loop = io_loop or IOLoop.instance()
-    
+
+    def _next_tick(self, callback, *args, **kwargs):
+        if callback:
+            _check_callback(callback)
+            self.io_loop.add_callback(partial(callback, *args, **kwargs))
+
     def _run_callback(self, callback, *args, **kwargs):
         try:
             callback(*args, **kwargs)
@@ -153,8 +158,7 @@ class AsyncResult(ToroBase):
                 # Non-blocking get
                 return self.value
 
-            _check_callback(callback)
-            self.io_loop.add_callback(partial(callback, self.value))
+            self._next_tick(callback, self.value)
         else:
             if not callback:
                 raise NotReady
@@ -194,11 +198,9 @@ class Condition(ToroBase):
         for waiter in waiters:
             waiter.run()
 
-        if callback:
-            _check_callback(callback)
-            self.io_loop.add_callback(callback)
+        self._next_tick(callback)
 
-    def notify_all(self, callback):
+    def notify_all(self, callback=None):
         self.notify(len(self.waiters), callback)
 
 
@@ -253,8 +255,7 @@ class Event(ToroBase):
         (or fractions thereof).
         """
         if self._flag:
-            _check_callback(callback)
-            self.io_loop.add_callback(callback)
+            self._next_tick(callback)
         else:
             self._waiters.append(
                 _Waiter(timeout, (), self.io_loop, callback))
@@ -344,9 +345,7 @@ class Queue(ToroBase):
             # Call _put and _get in case subclasses have special logic for them
             self._put(item)
             getter.run(self._get())
-            if callback:
-                _check_callback(callback)
-                self.io_loop.add_callback(partial(callback, True))
+            self._next_tick(callback, True)
         elif self.maxsize == self.qsize() and callback:
             _check_callback(callback)
 
@@ -363,9 +362,7 @@ class Queue(ToroBase):
             raise Full
         else:
             self._put(item)
-            if callback:
-                _check_callback(callback)
-                self.io_loop.add_callback(partial(callback, True))
+            self._next_tick(callback, True)
 
     def get(self, callback=None, timeout=None):
         """Remove and return an item from the queue.
@@ -485,8 +482,7 @@ class JoinableQueue(Queue):
         timeout to determine if this has happened.
         """
         if self.unfinished_tasks == 0:
-            _check_callback(callback)
-            self.io_loop.add_callback(callback)
+            self._next_tick(callback)
         else:
             self._cond.wait(callback, timeout)
 
