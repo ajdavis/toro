@@ -73,6 +73,27 @@ class TestAsyncResult(unittest.TestCase):
         self.assertRaises(toro.AlreadySet, result.set, 'whatever')
         done()
 
+    @async_test_engine()
+    def test_get_timeout(self, done):
+        result = toro.AsyncResult()
+        start = time.time()
+        value = yield gen.Task(result.get, timeout=.01)
+        duration = time.time() - start
+        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertEqual(None, value)
+        self.assertFalse(result.ready())
+
+        # Timed-out waiter doesn't cause error
+        result.set('foo')
+        self.assertTrue(result.ready())
+        start = time.time()
+        value = yield gen.Task(result.get, timeout=.01)
+        duration = time.time() - start
+        self.assertEqual('foo', value)
+        self.assertAlmostEqual(0, duration, places=2)
+        done()
+
+    # TODO: similar for all toro classes
     def test_exc(self):
         # Test that raising an exception from a get() callback doesn't
         # propagate up to set()'s caller, and that StackContexts are correctly
