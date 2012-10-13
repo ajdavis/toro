@@ -507,43 +507,51 @@ class Semaphore(ToroBase):
         super(Semaphore, self).__init__(io_loop)
         if value < 0:
             raise ValueError("semaphore initial value must be >= 0")
-        self.counter = value
-        self._condition = Condition()
-        self._locked_condition = Condition()
+
+        # The semaphore is implemented as a Queue with 'value' objects
+        # TODO: init queue with sequence
+        self.q = Queue()
+        for i in range(value):
+            self.q.put(None)
+
+        self._unlocked = Event()
+        if value:
+            self._unlocked.set()
 
     def __str__(self):
-        return '<%s counter=%s condition=%s>' % (
-            self.__class__.__name__, self.counter, self._condition)
+        return '<%s counter=%s>' % (
+            self.__class__.__name__, self.counter)
+
+    @property
+    def counter(self):
+        return self.q.qsize()
 
     def locked(self):
         """True if :attr:`counter` is zero"""
-        return self.counter <= 0
+        return self.q.empty()
 
+    # TODO: test callback
     def release(self, callback=None):
-        if self._condition.waiters:
-            self._condition.notify(1, callback) # wake one waiter
-        else:
-            self.counter += 1
-        self._locked_condition.notify_all(callback)
+        self.q.put(None)
+        self._unlocked.set(callback)
 
+    # TODO: test better?
     def wait(self, callback, timeout=None):
         """Wait for :attr:`locked` to be False"""
-        if not self.locked():
-            self._next_tick(callback)
-        else:
-            self._locked_condition.wait(callback, timeout)
+        self._unlocked.wait(callback, timeout)
 
     def acquire(self, callback=None, timeout=None):
-        if self.counter > 0:
-            # acquired
-            self.counter -= 1
-            self._next_tick(callback)
-            return True
+        if callback:
+            _check_callback(callback)
+            # The Queue will return Empty on timeout, else None, we want those
+            # values to be False or True.
+            self.q.get(lambda value: callback(value is not Empty), timeout)
         else:
-            # not acquired
-            if callback:
-                self._condition.wait(callback, timeout)
-            return False
+            try:
+                self.q.get()
+                return True
+            except Empty:
+                return False
 
 
 class BoundedSemaphore(Semaphore):

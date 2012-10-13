@@ -213,16 +213,18 @@ class TestTimeoutAcquire(unittest.TestCase):
     def test_acquire_returns_false_after_timeout(self, done):
         s = toro.Semaphore(value=0)
         result = yield gen.Task(s.acquire, timeout=0.01)
-        self.assertFalse(result)
+
+        # result can't be None, only precisely False
+        self.assertTrue(result is False)
         done()
 
     @async_test_engine()
     def test_release_twice(self, done):
         s = toro.Semaphore()
         result = []
-        s.acquire(lambda: result.append('a'))
+        s.acquire(lambda x: result.append('a'))
         s.release()
-        s.acquire(lambda: result.append('b'))
+        s.acquire(lambda x: result.append('b'))
         s.release()
         yield gen.Task(IOLoop.instance().add_timeout, time.time() + .01)
         self.assertEqual(result, ['a', 'b'])
