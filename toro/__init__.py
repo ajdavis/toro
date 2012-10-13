@@ -487,14 +487,69 @@ class JoinableQueue(Queue):
             self._cond.wait(callback, timeout)
 
 
-# TODO
 class Semaphore(ToroBase):
-    pass
+    """A semaphore manages a counter representing the number of release() calls minus the number of acquire() calls,
+    plus an initial value. The acquire() method blocks if necessary until it can return without making the counter
+    negative.
+
+    If not given, value defaults to 1."""
+    def __init__(self, value=1, io_loop=None):
+        super(Semaphore, self).__init__(io_loop)
+        if value < 0:
+            raise ValueError("semaphore initial value must be >= 0")
+        self.counter = value
+        self._condition = Condition()
+        self._locked_condition = Condition()
+
+    def __str__(self):
+        return '<%s counter=%s condition=%s>' % (
+            self.__class__.__name__, self.counter, self._condition)
+
+    def locked(self):
+        """True if :attr:`counter` is zero"""
+        return self.counter <= 0
+
+    def release(self):
+        if self._condition.waiters:
+            self._condition.notify() # wake one waiter
+        else:
+            self.counter += 1
+        self._locked_condition.notify_all()
+
+    def wait(self, callback, timeout=None):
+        """Wait for :attr:`locked` to be False"""
+        if not self.locked():
+            self._next_tick(callback)
+        else:
+            self._locked_condition.wait(callback, timeout)
+
+    def acquire(self, callback=None, timeout=None):
+        if self.counter > 0:
+            # acquired
+            self.counter -= 1
+            self._next_tick(callback)
+            return True
+        else:
+            # not acquired
+            if callback:
+                self._condition.wait(callback, timeout)
+            return False
 
 
-# TODO
-class BoundedSemaphore(ToroBase):
-    pass
+class BoundedSemaphore(Semaphore):
+    """A bounded semaphore checks to make sure its current value doesn't exceed its initial value.
+    If it does, ``ValueError`` is raised. In most situations semaphores are used to guard resources
+    with limited capacity. If the semaphore is released too many times it's a sign of a bug.
+
+    If not given, *value* defaults to 1."""
+    def __init__(self, value=1, io_loop=None):
+        super(BoundedSemaphore, self).__init__(value, io_loop)
+        self._initial_value = value
+
+    def release(self):
+        if self.counter >= self._initial_value:
+            raise ValueError("Semaphore released too many times")
+        return super(BoundedSemaphore, self).release()
 
 
 # TODO
