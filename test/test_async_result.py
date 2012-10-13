@@ -22,6 +22,11 @@ class TestAsyncResult(unittest.TestCase):
         str(result)
         result.set('fizzle')
         self.assertTrue('fizzle' in str(result))
+        self.assertFalse('waiters' in str(result))
+
+        result = toro.AsyncResult()
+        result.get(lambda: None)
+        self.assertTrue('waiters' in str(result))
 
     def test_get_nowait(self):
         # Without a callback, get() is non-blocking. 'timeout' is ignored.
@@ -40,12 +45,14 @@ class TestAsyncResult(unittest.TestCase):
     @async_test_engine()
     def test_set(self, done):
         result = toro.AsyncResult()
+        self.assertFalse(result.ready())
         IOLoop.instance().add_timeout(
             time.time() + .01, partial(result.set, 'hello'))
         start = time.time()
         value = yield gen.Task(result.get)
         duration = time.time() - start
         self.assertAlmostEqual(.01, duration, places=2)
+        self.assertTrue(result.ready())
         self.assertEqual('hello', value)
 
         # Second and third get()'s work too

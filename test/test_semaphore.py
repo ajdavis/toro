@@ -1,7 +1,7 @@
 """
 Test toro.Semaphore.
 
-Adapted from Gevent's lock_tests.py.
+Adapted from Gevent's lock_tests.py and test__semaphore.py
 """
 
 import unittest
@@ -15,6 +15,7 @@ import toro
 from test.async_test_engine import async_test_engine
 
 
+# Adapted from Gevent's lock_tests.py
 class BaseSemaphoreTests(unittest.TestCase):
     semtype = None
 
@@ -22,11 +23,27 @@ class BaseSemaphoreTests(unittest.TestCase):
         self.assertRaises(ValueError, self.semtype, value = -1)
         self.assertRaises(ValueError, self.semtype, value = -sys.maxint)
 
+    def test_str(self):
+        q = self.semtype(5)
+        self.assertTrue(self.semtype.__name__ in str(q))
+        self.assertTrue('counter=5' in str(q))
+
     @async_test_engine()
     def test_acquire(self, done):
         sem = self.semtype(1)
-        sem.acquire()
+        self.assertFalse(sem.locked())
+        result = sem.acquire()
+        self.assertTrue(result)
+        self.assertTrue(sem.locked())
+        # Wait for release()
+        sem.wait(callback=(yield gen.Callback('unlocked0')))
         sem.release()
+        yield gen.Wait('unlocked0')
+
+        # Now wait() is instant
+        sem.wait(callback=(yield gen.Callback('unlocked1')))
+        yield gen.Wait('unlocked1')
+
         sem = self.semtype(2)
         sem.acquire()
         sem.acquire()
@@ -152,6 +169,9 @@ class BaseSemaphoreTests(unittest.TestCase):
     # Gevent's test_with isn't relevant to Toro
     #def test_with(self):
 
+# Not a test - called from SemaphoreTests and BoundedSemaphoreTests
+BaseSemaphoreTests.__test__ = False
+
 
 class SemaphoreTests(BaseSemaphoreTests):
     """
@@ -167,6 +187,8 @@ class SemaphoreTests(BaseSemaphoreTests):
         sem.acquire()
         sem.release()
 
+SemaphoreTests.__test__ = True
+
 
 class BoundedSemaphoreTests(BaseSemaphoreTests):
     """
@@ -181,3 +203,27 @@ class BoundedSemaphoreTests(BaseSemaphoreTests):
         sem.acquire()
         sem.release()
         self.assertRaises(ValueError, sem.release)
+
+BoundedSemaphoreTests.__test__ = True
+
+
+# Adapted from Gevent's test__semaphore.py
+class TestTimeoutAcquire(unittest.TestCase):
+    @async_test_engine()
+    def test_acquire_returns_false_after_timeout(self, done):
+        s = toro.Semaphore(value=0)
+        result = yield gen.Task(s.acquire, timeout=0.01)
+        self.assertFalse(result)
+        done()
+
+    @async_test_engine()
+    def test_release_twice(self, done):
+        s = toro.Semaphore()
+        result = []
+        s.acquire(lambda: result.append('a'))
+        s.release()
+        s.acquire(lambda: result.append('b'))
+        s.release()
+        yield gen.Task(IOLoop.instance().add_timeout, time.time() + .01)
+        self.assertEqual(result, ['a', 'b'])
+        done()

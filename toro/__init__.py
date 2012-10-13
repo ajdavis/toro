@@ -140,6 +140,8 @@ class AsyncResult(ToroBase):
             result += 'value=%r' % self.value
         else:
             result += 'unset'
+            if self.waiters:
+                result += ' waiters[%s]' % len(self.waiters)
         return result + '>'
 
     def set(self, value):
@@ -173,11 +175,16 @@ class AsyncResult(ToroBase):
 
 
 # TODO: Note we don't have or need acquire() and release()
-# TODO: impl and test __str__
 class Condition(ToroBase):
     def __init__(self, io_loop=None):
         super(Condition, self).__init__(io_loop)
         self.waiters = collections.deque([]) # Queue of _Waiter objects
+
+    def __str__(self):
+        result = '<%s' % (self.__class__.__name__, )
+        if self.waiters:
+            result += ' waiters[%s]' % len(self.waiters)
+        return result + '>'
 
     def _consume_timed_out_waiters(self):
         # Delete waiters at the head of the queue who've timed out

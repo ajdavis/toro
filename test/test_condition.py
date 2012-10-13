@@ -16,6 +16,13 @@ def make_callback(key, history):
 
 
 class TestCondition(unittest.TestCase):
+    def test_str(self):
+        c = toro.Condition()
+        self.assertTrue('Condition' in str(c))
+        self.assertFalse('waiters' in str(c))
+        c.wait(lambda: None)
+        self.assertTrue('waiters' in str(c))
+
     @async_test_engine()
     def test_notify(self, done):
         loop = IOLoop.instance()
