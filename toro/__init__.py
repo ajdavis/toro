@@ -5,6 +5,10 @@
 # TODO: check on Gevent's licensing
 # TODO: review reprs and __str__'s
 # TODO: test custom ioloop handling
+# TODO: did I omit Gevent tests from the 2.7/ dir?
+# TODO: for non-blocking wait() acquire() etc. that don't raise exceptions,
+#   warn vehemently that they won't block and you must check return value!
+
 import heapq
 import logging
 import time
@@ -169,6 +173,7 @@ class AsyncResult(ToroBase):
 
 
 # TODO: Note we don't have or need acquire() and release()
+# TODO: impl and test __str__
 class Condition(ToroBase):
     def __init__(self, io_loop=None):
         super(Condition, self).__init__(io_loop)
@@ -187,6 +192,7 @@ class Condition(ToroBase):
             _Waiter(timeout, (), self.io_loop, callback))
 
     def notify(self, n=1, callback=None):
+        # TODO: doc, optional callback() is run after waiters are awakened
         self._consume_timed_out_waiters()
         waiters = [] # Waiters we plan to run right now
         while n and self.waiters:
