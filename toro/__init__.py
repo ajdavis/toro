@@ -227,7 +227,7 @@ class Event(ToroBase):
 
     def __init__(self, io_loop=None):
         super(Event, self).__init__(io_loop)
-        self._waiters = []
+        self.condition = Condition(io_loop)
         self._flag = False
 
     def __str__(self):
@@ -240,14 +240,13 @@ class Event(ToroBase):
     isSet = is_set  # makes it a better drop-in replacement for threading.Event
     ready = is_set  # makes it compatible with AsyncResult
 
-    def set(self):
+    # TODO: test w/ callback, doc the callback
+    def set(self, callback=None):
         """Set the internal flag to true. All waiters are awakened.
         Greenlets that call :meth:`wait` once the flag is true will not block at all.
         """
         self._flag = True
-        links, self._waiters = self._waiters, []
-        for waiter in links:
-            waiter.run()
+        self.condition.notify_all(callback)
 
     def clear(self):
         """Reset the internal flag to false.
@@ -269,8 +268,7 @@ class Event(ToroBase):
         if self._flag:
             self._next_tick(callback)
         else:
-            self._waiters.append(
-                _Waiter(timeout, (), self.io_loop, callback))
+            self.condition.wait(callback, timeout)
 
 
 class Queue(ToroBase):
