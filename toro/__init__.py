@@ -10,7 +10,9 @@
 # TODO: we may need to do serious thinking about exceptions and Tornado
 #   StackContexts and get some input from bdarnell
 # TODO: document dependencies: Lock -> Semaphore -> Condition, and so on
-
+# TODO: NOTE that while Tornado's "timeout" parameters are seconds
+#   since epoch, this timeout is seconds from **now**, consistent
+#   with threading.Condition
 import heapq
 import logging
 import time
@@ -120,9 +122,8 @@ class AsyncResult(ToroBase):
     """A one-time event that stores a value or an exception.
 
     Like :class:`Event` it wakes up all the waiters when :meth:`set`
-    is called. Waiters may receive the passed value by calling :meth:`get`
-    method instead of :meth:`wait`. An :class:`AsyncResult` instance cannot be
-    reset.
+    is called. Waiters receive the passed value by calling :meth:`get`.
+    An :class:`AsyncResult` instance cannot be reset.
 
     To pass a value call :meth:`set`. Calls to :meth:`get` (those currently
     blocking as well as those made in the future) will return the value:
@@ -131,6 +132,9 @@ class AsyncResult(ToroBase):
         >>> result.set(100)
         >>> result.get()
         100
+
+    :Parameters:
+      - `io_loop`: Optional custom IOLoop.
     """
     def __init__(self, io_loop=None):
         super(AsyncResult, self).__init__(io_loop)
@@ -149,7 +153,12 @@ class AsyncResult(ToroBase):
         return result + '>'
 
     def set(self, value, callback=None):
-        # TODO: doc the callback
+        """Set a value and wake up all the waiters.
+
+        :Parameters:
+          - `callback`: Optional callback taking no arguments, run after the
+            waiters.
+        """
         if self._ready:
             raise AlreadySet
 
@@ -166,7 +175,16 @@ class AsyncResult(ToroBase):
         return self._ready
 
     def get(self, callback=None, timeout=None):
-        """TODO: doc"""
+        """Get a value now or after :meth:`set` is called. If called without a
+        callback, returns the value or raises :exc:`NotReady`. If called
+        with a callback, passes the value to the callback on the next iteration
+        of the IOLoop, after :meth:`set` is called.
+
+        :Parameters:
+          - `callback`: Optional callback taking one argument, this
+            AsyncResult's value. Receives ``None`` after a timeout.
+          - `timeout`: Optional timeout, seconds from now.
+        """
         if self.ready():
             if not callback:
                 # Non-blocking get
@@ -184,6 +202,12 @@ class AsyncResult(ToroBase):
 
 # TODO: Note we don't have or need acquire() and release()
 class Condition(ToroBase):
+    """
+    TODO: copy Python stdlib docs
+
+    :Parameters:
+      - `io_loop`: Optional custom IOLoop.
+    """
     def __init__(self, io_loop=None):
         super(Condition, self).__init__(io_loop)
         self.waiters = collections.deque([]) # Queue of _Waiter objects
@@ -200,16 +224,28 @@ class Condition(ToroBase):
             self.waiters.popleft()
 
     def wait(self, callback=None, timeout=None):
-        # TODO: NOTE that while Tornado's "timeout" parameters are seconds
-        #   since epoch, this timeout is seconds from **now**, consistent
-        #   with threading.Condition
+        """Register a callback to be executed after :meth:`notify`.
+
+        .. note:: If you set a timeout, there is no way to determine whether
+           `callback` was run because of a notify or a timeout.
+
+        :Parameters:
+          - `callback`: Function taking no arguments.
+          - `timeout`: Optional timeout, seconds from now.
+        """
         self.waiters.append(
             _Waiter(timeout, (), self.io_loop, callback))
 
     def notify(self, n=1, callback=None):
-        # TODO: doc, optional callback() is run after waiters are awakened
-        # We call _next_tick *before* waiter.run(). We want callback to run
-        # any waiters, but before any callbacks *they* schedule.
+        """Wake up `n` waiters.
+
+        :Parameters:
+          - `n`: The number of waiters to awaken (default: 1)
+          - `callback`: Optional callback taking no arguments, run after the
+            waiters.
+        """
+        # We call _next_tick *before* waiter.run(). We want the callback to run
+        # after the waiters, but before any callbacks *they* schedule.
         self._consume_timed_out_waiters()
         self._next_tick(callback)
 
@@ -224,6 +260,12 @@ class Condition(ToroBase):
             waiter.run()
 
     def notify_all(self, callback=None):
+        """Wake up all waiters.
+
+        :Parameters:
+          - `callback`: Optional callback taking no arguments, run after the
+            waiters.
+        """
         self.notify(len(self.waiters), callback)
 
 
@@ -234,8 +276,10 @@ class Event(ToroBase):
     An Event object manages an internal flag that can be set to true with the
     :meth:`set` method and reset to false with the :meth:`clear` method. The :meth:`wait` method
     blocks until the flag is true.
-    """
 
+    :Parameters:
+      - `io_loop`: Optional custom IOLoop.
+    """
     def __init__(self, io_loop=None):
         super(Event, self).__init__(io_loop)
         self.condition = Condition(io_loop)
@@ -245,36 +289,42 @@ class Event(ToroBase):
         return '<%s %s>' % (self.__class__.__name__, (self._flag and 'set') or 'clear')
 
     def is_set(self):
-        """Return true if and only if the internal flag is true."""
+        """Return ``True`` if and only if the internal flag is true."""
         return self._flag
 
     isSet = is_set  # makes it a better drop-in replacement for threading.Event
     ready = is_set  # makes it compatible with AsyncResult
 
-    # TODO: doc the callback
     def set(self, callback=None):
-        """Set the internal flag to true. All waiters are awakened.
-        Greenlets that call :meth:`wait` once the flag is true will not block at all.
+        """Set the internal flag to ``True``. All waiters are awakened.
+        Calls :meth:`wait` once the flag is true will not block.
+
+        :Parameters:
+          - `callback`: Optional callback taking no arguments, run after the
+            waiters.
         """
         self._flag = True
         self.condition.notify_all(callback)
 
     def clear(self):
-        """Reset the internal flag to false.
-        Subsequently, threads calling :meth:`wait`
+        """Reset the internal flag to ``False``. Subsequently, calls to :meth:`wait`
         will block until :meth:`set` is called to set the internal flag to true again.
         """
         self._flag = False
 
     def wait(self, callback, timeout=None):
         """Block until the internal flag is true.
-        If the internal flag is true on entry, return immediately. Otherwise,
-        block until another task calls :meth:`set` to set the flag to true,
-        or until the optional timeout occurs.
+        If the flag is already true, the callback is run immediately.
+        Otherwise, block until another task calls :meth:`set` to set the flag
+        to true, or until the optional timeout occurs.
 
-        When the *timeout* argument is present and not ``None``, it should be a
-        floating point number specifying a timeout for the operation in seconds
-        (or fractions thereof).
+        .. note:: If you set a timeout, you can determine whether
+           `callback` was run because of a :meth:`set` or a timeout by checking
+           :meth:`is_set`.
+
+        :Parameters:
+          - `callback`: Function taking no arguments.
+          - `timeout`: Optional timeout, seconds from now.
         """
         if self._flag:
             self._next_tick(callback)
@@ -283,6 +333,13 @@ class Event(ToroBase):
 
 
 class Queue(ToroBase):
+    """
+    TODO: doc from Gevent Queue
+
+    :Parameters:
+      - `max_size`: Optional size limit (no limit by default).
+      - `io_loop`: Optional custom IOLoop.
+    """
     def __init__(self, maxsize=None, io_loop=None):
         super(Queue, self).__init__(io_loop)
         if maxsize is not None and maxsize < 0:
@@ -329,6 +386,7 @@ class Queue(ToroBase):
         return result
 
     def qsize(self):
+        """Number of items in the queue"""
         return len(self.queue)
 
     def empty(self):
@@ -336,6 +394,11 @@ class Queue(ToroBase):
         return not self.queue
 
     def full(self):
+        """Return ``True`` if there are `maxsize` items in the queue.
+
+        .. note:: if the Queue was initialized with `maxsize=None`
+          (the default), then :meth:`full` is never ``True``.
+        """
         if self.maxsize is None:
             return False
         elif self.maxsize == 0:
@@ -350,10 +413,15 @@ class Queue(ToroBase):
         If optional arg *block* is true and *timeout* is ``None`` (the default),
         block if necessary until a free slot is available. If *timeout* is
         a positive number, it blocks at most *timeout* seconds and raises
-        the :class:`Full` exception if no free slot was available within that time.
+        the :exc:`Queue.Full` exception if no free slot was available within that time.
         Otherwise (*block* is false), put an item on the queue if a free slot
         is immediately available, else raise the :class:`Full` exception (*timeout*
         is ignored in that case).
+
+        :Parameters:
+          - `callback`: Optional callback taking no arguments, run after the
+            waiter.
+          - `timeout`: Optional timeout, seconds from now.
         """
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
@@ -388,12 +456,17 @@ class Queue(ToroBase):
     def get(self, callback=None, timeout=None):
         """Remove and return an item from the queue.
 
+        # TODO: update
         If optional args *block* is true and *timeout* is ``None`` (the default),
         block if necessary until an item is available. If *timeout* is a positive number,
-        it blocks at most *timeout* seconds and raises the :class:`Empty` exception
+        it blocks at most *timeout* seconds and raises the :exc:`Queue.Empty` exception
         if no item was available within that time. Otherwise (*block* is false), return
         an item if one is immediately available, else raise the :class:`Empty` exception
         (*timeout* is ignored in that case).
+
+        :Parameters:
+          - `callback`: Optional callback one argument.
+          - `timeout`: Optional timeout, seconds from now.
         """
         # TODO: NOTE that while Tornado's "timeout" parameters are seconds
         #   since epoch, this timeout is seconds from **now**, consistent
@@ -426,8 +499,11 @@ class PriorityQueue(Queue):
     (lowest first).
 
     Entries are typically tuples of the form: ``(priority number, data)``.
-    """
 
+    :Parameters:
+      - `max_size`: Optional size limit (no limit by default).
+      - `io_loop`: Optional custom IOLoop.
+    """
     def _init(self, maxsize):
         self.queue = []
 
@@ -440,8 +516,12 @@ class PriorityQueue(Queue):
 
 class LifoQueue(Queue):
     """A subclass of :class:`Queue` that retrieves most recently added entries
-    first."""
+    first.
 
+    :Parameters:
+      - `max_size`: Optional size limit (no limit by default).
+      - `io_loop`: Optional custom IOLoop.
+    """
     def _init(self, maxsize):
         self.queue = []
 
@@ -454,8 +534,12 @@ class LifoQueue(Queue):
 
 class JoinableQueue(Queue):
     """A subclass of :class:`Queue` that additionally has :meth:`task_done` and
-    :meth:`join` methods."""
+    :meth:`join` methods.
 
+    :Parameters:
+      - `max_size`: Optional size limit (no limit by default).
+      - `io_loop`: Optional custom IOLoop.
+    """
     def __init__(self, maxsize=None, io_loop=None):
         Queue.__init__(self, maxsize, io_loop)
         self.unfinished_tasks = 0
@@ -476,14 +560,18 @@ class JoinableQueue(Queue):
     # TODO: doc the callback
     def task_done(self, callback=None):
         """Indicate that a formerly enqueued task is complete. Used by queue consumers.
-        For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to :meth:`task_done` tells the queue
-        that the processing on the task is complete.
+        For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to
+        :meth:`task_done` tells the queue that the processing on the task is complete.
 
         If a :meth:`join` is currently blocking, it will resume when all items have been processed
         (meaning that a :meth:`task_done` call was received for every item that had been
         :meth:`put <Queue.put>` into the queue).
 
         Raises a :exc:`ValueError` if called more times than there were items placed in the queue.
+
+        :Parameters:
+          - `callback`: Optional callback taking no arguments, run after any
+            waiters.
         """
         # We call _next_tick *before* waiter.run(). We want callback to run
         # any waiters, but before any callbacks *they* schedule.
@@ -505,6 +593,10 @@ class JoinableQueue(Queue):
         If timeout is not None, the callback may be executed before all tasks
         are complete. Check the value of unfinished_tasks after a join() with a
         timeout to determine if this has happened.
+
+        :Parameters:
+          - `callback`: Function taking no arguments.
+          - `timeout`: Optional timeout, seconds from now.
         """
         if self.unfinished_tasks == 0:
             self._next_tick(callback)
@@ -517,7 +609,12 @@ class Semaphore(object):
     plus an initial value. The acquire() method blocks if necessary until it can return without making the counter
     negative.
 
-    If not given, value defaults to 1."""
+    If not given, value defaults to 1.
+
+    :Parameters:
+      - `value`: An int, the initial value (default 1).
+      - `io_loop`: Optional custom IOLoop.
+    """
     def __init__(self, value=1, io_loop=None):
         if value < 0:
             raise ValueError("semaphore initial value must be >= 0")
@@ -538,6 +635,7 @@ class Semaphore(object):
 
     @property
     def counter(self):
+        """An integer, the current semaphore value"""
         return self.q.qsize()
 
     def locked(self):
@@ -545,18 +643,52 @@ class Semaphore(object):
         return self.q.empty()
 
     def release(self, callback=None):
+        """Increment :attr:`counter` and wake one waiter blocking on
+        :meth:`acquire`.
+
+        :Parameters:
+          - `callback`: Optional callback taking no arguments, run after the
+            waiter.
+        """
         self.q.put(None)
+        # TODO: what if locked() is still True here, because there was a
+        # waiter for get() or because get() triggered a function that did
+        # another acquire()?
         self._unlocked.set(callback)
 
     def wait(self, callback, timeout=None):
-        """Wait for :attr:`locked` to be False"""
+        """Wait for :attr:`locked` to be False
+
+        .. note:: If you set a timeout, you can determine whether
+           `callback` was run because of a :meth:`release` or a timeout by
+           checking :meth:`locked`.
+
+        :Parameters:
+          - `callback`: Function taking no arguments.
+          - `timeout`: Optional timeout, seconds from now.
+        """
         self._unlocked.wait(callback, timeout)
 
     def acquire(self, callback=None, timeout=None):
+        """If a callback is passed, then decrement :attr:`counter` and run
+        the callback. If the counter is zero, wait for a
+        :meth:`release` or a timeout before running the callback.
+
+        If no callback is passed, then if the counter is zero return ``False``,
+        else if the counter is positive decrement it and return ``True``.
+
+        .. note:: If you set a timeout, you can determine whether
+           `callback` was run because of a :meth:`release` or a timeout by
+           checking :meth:`locked`.
+
+        :Parameters:
+          - `callback`: Optional function taking no arguments.
+          - `timeout`: Optional timeout, seconds from now.
+        """
         if callback:
             _check_callback(callback)
-            # The Queue will return Empty on timeout, else None, we want those
-            # values to be False or True.
+            # The Queue will return Empty on timeout, else None. Transform
+            # those values into False or True.
             self.q.get(lambda value: callback(value is not Empty), timeout)
         else:
             try:
@@ -583,6 +715,11 @@ class BoundedSemaphore(Semaphore):
 
 
 class Lock(object):
+    """# TODO: doc from Gevent or stdlib
+
+    :Parameters:
+      - `io_loop`: Optional custom IOLoop.
+    """
     def __init__(self, io_loop=None):
         self._block = Semaphore(1, io_loop)
 
@@ -592,11 +729,30 @@ class Lock(object):
             self._block)
 
     def acquire(self, callback=None, timeout=None):
+        """
+        TODO: doc
+
+        .. note:: If you set a timeout, you can determine whether
+           `callback` was run because of a :meth:`release` or a timeout by
+           checking :meth:`locked`.
+
+        :Parameters:
+          - `callback`: Function taking no arguments.
+          - `timeout`: Optional timeout, seconds from now.
+        """
         return self._block.acquire(callback, timeout)
 
     def release(self, callback=None):
+        """
+        TODO: doc
+
+        :Parameters:
+          - `callback`: Optional callback taking no arguments, run after the
+            waiter.
+        """
         self._block.release(callback)
 
     def locked(self):
+        """``True`` if the lock has been acquired"""
         return self._block.locked()
 

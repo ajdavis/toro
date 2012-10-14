@@ -19,8 +19,3 @@ Queue
 PriorityQueue
 LifoQueue
 JoinableQueue
-
-dependencies:
-
-Semaphore <- Lock
-          <- BoundedSemaphore
