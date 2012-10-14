@@ -8,15 +8,10 @@ import unittest
 from tornado import gen
 from tornado.ioloop import IOLoop
 
-
 import toro
+
+from test import make_callback
 from test.async_test_engine import async_test_engine
-
-
-def make_callback(key, history):
-    def callback():
-        history.append(key)
-    return callback
 
 
 class TestCondition(unittest.TestCase):
@@ -33,6 +28,38 @@ class TestCondition(unittest.TestCase):
         c = toro.Condition()
         loop.add_timeout(time.time() + .1, c.notify)
         yield gen.Task(c.wait)
+        done()
+
+    @async_test_engine()
+    def test_notify_1_callback(self, done):
+        # Test that a callback passed to noity() runs after callbacks
+        # registered with wait()
+        c = toro.Condition()
+        history = []
+        c.wait(make_callback('wait1', history))
+        c.wait(make_callback('wait2', history))
+        c.notify(1, make_callback('notify1', history))
+
+        # Wait for next tick - meanwhile, notify1 runs
+        yield gen.Task(IOLoop.instance().add_callback)
+        c.notify(1, make_callback('notify2', history))
+        yield gen.Task(IOLoop.instance().add_callback)
+        self.assertEqual(['wait1', 'notify1', 'wait2', 'notify2'], history)
+        done()
+
+    @async_test_engine()
+    def test_notify_1_callback(self, done):
+        # Test that a callback passed to noity_all() runs after callbacks
+        # registered with wait()
+        c = toro.Condition()
+        history = []
+        c.wait(make_callback('wait1', history))
+        c.wait(make_callback('wait2', history))
+        c.notify_all(make_callback('notify_all', history))
+
+        # Wait for next tick - meanwhile, notify_all runs
+        yield gen.Task(IOLoop.instance().add_callback)
+        self.assertEqual(['wait1', 'wait2', 'notify_all'], history)
         done()
 
     @async_test_engine()

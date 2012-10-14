@@ -12,6 +12,8 @@ from tornado.ioloop import IOLoop
 
 
 import toro
+
+from test import make_callback
 from test.async_test_engine import async_test_engine
 
 # Adapted from Gevent's lock_tests.py.
@@ -101,6 +103,19 @@ class LockTests2(unittest.TestCase):
         self.assertTrue(lock.locked())
         done()
 
+    @async_test_engine()
+    def test_set_callback(self, done):
+        # Test that a callback passed to acquire() runs after callbacks
+        # registered with release()
+        lock = toro.Lock()
+        history = []
+        lock.acquire(make_callback('acquire1', history))
+        lock.acquire(make_callback('acquire2', history))
+        lock.release(make_callback('release', history))
+        yield gen.Task(IOLoop.instance().add_callback)
+        self.assertEqual(['acquire1', 'acquire2', 'release'], history)
+        done()
+    
     def test_io_loop(self):
         global_loop = IOLoop.instance()
         custom_loop = IOLoop()

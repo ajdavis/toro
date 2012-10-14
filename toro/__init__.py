@@ -142,10 +142,14 @@ class AsyncResult(ToroBase):
                 result += ' waiters[%s]' % len(self.waiters)
         return result + '>'
 
-    def set(self, value):
+    def set(self, value, callback=None):
+        # TODO: doc the callback
         if self._ready:
             raise AlreadySet
 
+        # We call _next_tick *before* waiter.run(). We want callback to run
+        # any waiters, but before any callbacks *they* schedule.
+        self._next_tick(callback)
         self.value = value
         self._ready = True
         waiters, self.waiters = self.waiters, []
@@ -198,7 +202,11 @@ class Condition(ToroBase):
 
     def notify(self, n=1, callback=None):
         # TODO: doc, optional callback() is run after waiters are awakened
+        # We call _next_tick *before* waiter.run(). We want callback to run
+        # any waiters, but before any callbacks *they* schedule.
         self._consume_timed_out_waiters()
+        self._next_tick(callback)
+
         waiters = [] # Waiters we plan to run right now
         while n and self.waiters:
             waiter = self.waiters.popleft()
@@ -208,8 +216,6 @@ class Condition(ToroBase):
 
         for waiter in waiters:
             waiter.run()
-
-        self._next_tick(callback)
 
     def notify_all(self, callback=None):
         self.notify(len(self.waiters), callback)
@@ -239,7 +245,7 @@ class Event(ToroBase):
     isSet = is_set  # makes it a better drop-in replacement for threading.Event
     ready = is_set  # makes it compatible with AsyncResult
 
-    # TODO: test w/ callback, doc the callback
+    # TODO: doc the callback
     def set(self, callback=None):
         """Set the internal flag to true. All waiters are awakened.
         Greenlets that call :meth:`wait` once the flag is true will not block at all.
@@ -447,8 +453,8 @@ class JoinableQueue(Queue):
     def __init__(self, maxsize=None, io_loop=None):
         Queue.__init__(self, maxsize, io_loop)
         self.unfinished_tasks = 0
-        self._cond = Event(io_loop)
-        self._cond.set()
+        self._finished = Event(io_loop)
+        self._finished.set()
 
     def _format(self):
         result = Queue._format(self)
@@ -459,9 +465,10 @@ class JoinableQueue(Queue):
     def _put(self, item):
         Queue._put(self, item)
         self.unfinished_tasks += 1
-        self._cond.clear()
+        self._finished.clear()
 
-    def task_done(self):
+    # TODO: doc the callback
+    def task_done(self, callback=None):
         """Indicate that a formerly enqueued task is complete. Used by queue consumers.
         For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to :meth:`task_done` tells the queue
         that the processing on the task is complete.
@@ -472,11 +479,14 @@ class JoinableQueue(Queue):
 
         Raises a :exc:`ValueError` if called more times than there were items placed in the queue.
         """
+        # We call _next_tick *before* waiter.run(). We want callback to run
+        # any waiters, but before any callbacks *they* schedule.
+        self._next_tick(callback)
         if self.unfinished_tasks <= 0:
             raise ValueError('task_done() called too many times')
         self.unfinished_tasks -= 1
         if self.unfinished_tasks == 0:
-            self._cond.set()
+            self._finished.set()
 
     def join(self, callback, timeout=None):
         """Block until all items in the queue have been gotten and processed.
@@ -493,7 +503,7 @@ class JoinableQueue(Queue):
         if self.unfinished_tasks == 0:
             self._next_tick(callback)
         else:
-            self._cond.wait(callback, timeout)
+            self._finished.wait(callback, timeout)
 
 
 class Semaphore(object):
@@ -528,12 +538,10 @@ class Semaphore(object):
         """True if :attr:`counter` is zero"""
         return self.q.empty()
 
-    # TODO: test callback
     def release(self, callback=None):
         self.q.put(None)
         self._unlocked.set(callback)
 
-    # TODO: test better?
     def wait(self, callback, timeout=None):
         """Wait for :attr:`locked` to be False"""
         self._unlocked.wait(callback, timeout)

@@ -17,6 +17,8 @@ from tornado.gen import Task
 from tornado.ioloop import IOLoop
 
 import toro
+
+from test import make_callback
 from test.async_test_engine import async_test_engine
 
 # SECTION 1: Tests adapted from Gevent's test_queue.py (single underscore)
@@ -707,6 +709,22 @@ class TestJoinableQueue3(unittest.TestCase):
         self.assertEqual(0, q.unfinished_tasks)
 
         yield gen.Wait('join')
+        done()
+
+    @async_test_engine()
+    def test_queue_join_callback(self, done):
+        # Test that a callback passed to task_done() runs after callbacks
+        # registered with join()
+        q = toro.JoinableQueue()
+        history = []
+        q.put('foo')
+        q.put('foo')
+        q.join(make_callback('join', history))
+        q.task_done(make_callback('task_done1', history))
+        yield gen.Task(IOLoop.instance().add_callback) # Let task_done1 run
+        q.task_done(make_callback('task_done2', history))
+        yield gen.Task(IOLoop.instance().add_callback)
+        self.assertEqual(['task_done1', 'join', 'task_done2'], history)
         done()
 
     @async_test_engine()

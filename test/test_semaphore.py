@@ -12,6 +12,8 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 
 import toro
+
+from test import make_callback
 from test.async_test_engine import async_test_engine
 
 
@@ -228,4 +230,30 @@ class TestTimeoutAcquire(unittest.TestCase):
         s.release()
         yield gen.Task(IOLoop.instance().add_timeout, time.time() + .01)
         self.assertEqual(result, ['a', 'b'])
+        done()
+
+
+# Not adapted from Gevent's tests, specific to Toro
+class SemaphoreTests2(unittest.TestCase):
+    @async_test_engine()
+    def test_release_callback(self, done):
+        # Test that a callback passed to release() runs after callbacks
+        # registered with acquire()
+        sem = toro.Semaphore(0)
+        history = []
+        sem.acquire(make_callback('acquire1', history))
+        sem.acquire(make_callback('acquire2', history))
+        sem.wait(make_callback('wait1', history))
+        sem.wait(make_callback('wait2', history))
+        sem.release(make_callback('release1', history))
+        yield gen.Task(IOLoop.instance().add_callback)
+        sem.release(make_callback('release2', history))
+        yield gen.Task(IOLoop.instance().add_callback)
+        self.assertEqual([
+                # First release wakes first acquire plus all waits
+                'acquire1', 'wait1', 'wait2', 'release1',
+
+                # Second release wakes second acquire
+                'acquire2', 'release2'],
+            history)
         done()

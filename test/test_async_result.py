@@ -13,6 +13,7 @@ from tornado.ioloop import IOLoop
 
 import toro
 
+from test import make_callback
 from test.async_test_engine import async_test_engine
 
 
@@ -71,6 +72,19 @@ class TestAsyncResult(unittest.TestCase):
 
         # set() only allowed once
         self.assertRaises(toro.AlreadySet, result.set, 'whatever')
+        done()
+
+    @async_test_engine()
+    def test_set_callback(self, done):
+        # Test that a callback passed to set() runs after callbacks registered
+        # with get()
+        result = toro.AsyncResult()
+        history = []
+        result.get(make_callback('get1', history))
+        result.get(make_callback('get2', history))
+        result.set('foo', make_callback('set', history))
+        yield gen.Task(IOLoop.instance().add_callback)
+        self.assertEqual(['get1', 'get2', 'set'], history)
         done()
 
     @async_test_engine()
