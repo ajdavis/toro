@@ -8,12 +8,12 @@ from functools import partial
 import time
 import unittest
 
-from tornado import gen, stack_context
+from tornado import gen
 from tornado.ioloop import IOLoop
 
 import toro
 
-from test import make_callback
+from test import make_callback, BaseToroCommonTest
 from test.async_test_engine import async_test_engine
 
 
@@ -107,55 +107,14 @@ class TestAsyncResult(unittest.TestCase):
         self.assertAlmostEqual(0, duration, places=2)
         done()
 
-    # TODO: similar for all toro classes
-    def test_exc(self):
-        # Test that raising an exception from a get() callback doesn't
-        # propagate up to set()'s caller, and that StackContexts are correctly
-        # managed
-        result = toro.AsyncResult()
-        loop = IOLoop.instance()
-        loop.add_timeout(time.time() + .02, loop.stop)
 
-        # Absent Python 3's nonlocal keyword, we need some place to store
-        # results from inner functions
-        outcomes = {
-            'value': None,
-            'set_result_exc': None,
-            'get_result_exc': None,
-        }
+class TestAsyncResultCommon(unittest.TestCase, BaseToroCommonTest):
+    def toro_object(self, io_loop=None):
+        return toro.AsyncResult(io_loop)
 
-        def set_result():
-            try:
-                result.set('hello')
-            except Exception, e:
-                outcomes['set_result_exc'] = e
+    def notify(self, toro_object, value):
+        toro_object.set(value)
 
-        def callback(value):
-            outcomes['value'] = value
-            assert False
+    def wait(self, toro_object, callback):
+        toro_object.get(callback)
 
-        def catch_get_result_exception(type, value, traceback):
-            outcomes['get_result_exc'] = type
-
-        with stack_context.ExceptionStackContext(catch_get_result_exception):
-            result.get(callback)
-
-        loop.add_timeout(time.time() + .01, set_result)
-        loop.start()
-        self.assertEqual(outcomes['value'], 'hello')
-        self.assertEqual(outcomes['get_result_exc'], AssertionError)
-        self.assertEqual(outcomes['set_result_exc'], None)
-
-    def test_io_loop(self):
-        global_loop = IOLoop.instance()
-        custom_loop = IOLoop()
-        self.assertNotEqual(global_loop, custom_loop)
-        result = toro.AsyncResult(custom_loop)
-
-        def callback(value):
-            assert value == 'foo'
-            custom_loop.stop()
-
-        result.get(callback)
-        result.set('foo')
-        custom_loop.start()

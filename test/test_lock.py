@@ -13,7 +13,7 @@ from tornado.ioloop import IOLoop
 
 import toro
 
-from test import make_callback
+from test import make_callback, BaseToroCommonTest
 from test.async_test_engine import async_test_engine
 
 # Adapted from Gevent's lock_tests.py.
@@ -115,17 +115,19 @@ class LockTests2(unittest.TestCase):
         yield gen.Task(IOLoop.instance().add_callback)
         self.assertEqual(['acquire1', 'acquire2', 'release'], history)
         done()
-    
-    def test_io_loop(self):
-        global_loop = IOLoop.instance()
-        custom_loop = IOLoop()
-        self.assertNotEqual(global_loop, custom_loop)
-        lock = toro.Lock(custom_loop)
+
+
+class TestLockCommon(unittest.TestCase, BaseToroCommonTest):
+    def toro_object(self, io_loop=None):
+        lock = toro.Lock(io_loop)
+        # Start the lock acquired - BaseToroCommonTest expects wait() to await
+        # notify(), which is true for events, queues, etc., so make a lock
+        # that behaves the same
         lock.acquire()
+        return lock
 
-        def callback(v):
-            custom_loop.stop()
+    def notify(self, toro_object, value):
+        toro_object.release()
 
-        lock.acquire(callback)
-        lock.release()
-        custom_loop.start()
+    def wait(self, toro_object, callback):
+        toro_object.acquire(callback)

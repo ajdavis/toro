@@ -10,7 +10,7 @@ from tornado.ioloop import IOLoop
 
 import toro
 
-from test import make_callback
+from test import make_callback, BaseToroCommonTest
 from test.async_test_engine import async_test_engine
 
 
@@ -161,15 +161,14 @@ class TestCondition(unittest.TestCase):
         self.assertEqual([1, 0, 2], history)
         done()
 
-    def test_io_loop(self):
-        global_loop = IOLoop.instance()
-        custom_loop = IOLoop()
-        self.assertNotEqual(global_loop, custom_loop)
-        c = toro.Condition(custom_loop)
 
-        def callback():
-            custom_loop.stop()
+class TestConditionCommon(unittest.TestCase, BaseToroCommonTest):
+    def toro_object(self, io_loop=None):
+        return toro.Condition(io_loop)
 
-        c.wait(callback)
-        c.notify()
-        custom_loop.start()
+    def notify(self, toro_object, value):
+        toro_object.notify()
+
+    def wait(self, toro_object, callback):
+        toro_object.wait(callback)
+

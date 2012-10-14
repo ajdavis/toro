@@ -13,7 +13,7 @@ from tornado.ioloop import IOLoop
 
 import toro
 
-from test import make_callback
+from test import make_callback, BaseToroCommonTest
 from test.async_test_engine import async_test_engine
 
 
@@ -257,3 +257,14 @@ class SemaphoreTests2(unittest.TestCase):
                 'acquire2', 'release2'],
             history)
         done()
+
+
+class TestSemaphoreCommon(unittest.TestCase, BaseToroCommonTest):
+    def toro_object(self, io_loop=None):
+        return toro.Semaphore(io_loop=io_loop)
+
+    def notify(self, toro_object, value):
+        toro_object.release()
+
+    def wait(self, toro_object, callback):
+        toro_object.wait(callback)

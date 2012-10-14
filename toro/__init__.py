@@ -98,12 +98,18 @@ class _Waiter(ToroBase):
         if timeout is not None:
             self.io_loop.add_timeout(
                 time.time() + timeout, partial(self.run, *timeout_args))
+
+        # Capture the current stack context so it's restored when we're run
+        # after deferral.
         self.callback = stack_context.wrap(callback)
 
     def run(self, *args, **kwargs):
         if self.callback:
             callback, self.callback = self.callback, None
-            self._run_callback(callback, *args, **kwargs)
+            # Clear the current stack context and run in the context that was
+            # captured when we initialized.
+            with stack_context.NullContext():
+                self._run_callback(callback, *args, **kwargs)
 
     @property
     def expired(self):

@@ -7,12 +7,12 @@ Adapted from Gevent's lock_tests.py.
 import unittest
 import time
 
-from tornado import gen, stack_context
+from tornado import gen
 from tornado.ioloop import IOLoop
 
 import toro
 
-from test import make_callback
+from test import make_callback, BaseToroCommonTest
 from test.async_test_engine import async_test_engine
 
 
@@ -67,44 +67,6 @@ class TestEvent(unittest.TestCase):
         self.assertEqual(['wait1', 'wait2', 'set'], history)
         done()
 
-    def test_exc(self):
-        # Test that raising an exception from a wait() callback doesn't
-        # propagate up to set()'s caller, and that StackContexts are correctly
-        # managed
-        event = toro.Event()
-        loop = IOLoop.instance()
-        loop.add_timeout(time.time() + .02, loop.stop)
-
-        # Absent Python 3's nonlocal keyword, we need some place to store
-        # results from inner functions
-        outcomes = {
-            'callback_executed': False,
-            'set_result_exc': None,
-            'wait_result_exc': None,
-        }
-
-        def set_result():
-            try:
-                event.set()
-            except Exception, e:
-                outcomes['set_result_exc'] = e
-
-        def callback():
-            outcomes['callback_executed'] = True
-            assert False
-
-        def catch_wait_result_exception(type, value, traceback):
-            outcomes['wait_result_exc'] = type
-
-        with stack_context.ExceptionStackContext(catch_wait_result_exception):
-            event.wait(callback)
-
-        loop.add_timeout(time.time() + .01, set_result)
-        loop.start()
-        self.assertTrue(outcomes['callback_executed'])
-        self.assertEqual(outcomes['wait_result_exc'], AssertionError)
-        self.assertEqual(outcomes['set_result_exc'], None)
-
     @async_test_engine()
     def test_event_timeout(self, done):
         e = toro.Event()
@@ -140,15 +102,14 @@ class TestEvent(unittest.TestCase):
         self.assertEqual(None, result)
         done()
 
-    def test_io_loop(self):
-        global_loop = IOLoop.instance()
-        custom_loop = IOLoop()
-        self.assertNotEqual(global_loop, custom_loop)
-        e = toro.Event(custom_loop)
 
-        def callback():
-            custom_loop.stop()
+class TestEventCommon(unittest.TestCase, BaseToroCommonTest):
+    def toro_object(self, io_loop=None):
+        return toro.Event(io_loop)
 
-        e.wait(callback)
-        e.set()
-        custom_loop.start()
+    def notify(self, toro_object, value):
+        toro_object.set()
+
+    def wait(self, toro_object, callback):
+        toro_object.wait(callback)
+

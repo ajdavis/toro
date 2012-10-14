@@ -18,7 +18,7 @@ from tornado.ioloop import IOLoop
 
 import toro
 
-from test import make_callback
+from test import make_callback, BaseToroCommonTest
 from test.async_test_engine import async_test_engine
 
 # SECTION 1: Tests adapted from Gevent's test_queue.py (single underscore)
@@ -738,18 +738,13 @@ class TestJoinableQueue3(unittest.TestCase):
         self.assertEqual(1, q.unfinished_tasks)
         done()
 
-    def test_io_loop(self):
-        # JoinableQueue has additional IOLoop interaction because it
-        # has an internal Event
-        global_loop = IOLoop.instance()
-        custom_loop = IOLoop()
-        self.assertNotEqual(global_loop, custom_loop)
-        q = toro.JoinableQueue(None, custom_loop)
 
-        def callback():
-            custom_loop.stop()
+class TestQueueCommon(unittest.TestCase, BaseToroCommonTest):
+    def toro_object(self, io_loop=None):
+        return toro.Queue(io_loop)
 
-        q.put('foo')
-        q.join(callback)
-        q.task_done()
-        custom_loop.start()
+    def notify(self, toro_object, value):
+        toro_object.put(value)
+
+    def wait(self, toro_object, callback):
+        toro_object.get(callback)
