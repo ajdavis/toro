@@ -273,6 +273,8 @@ class Event(ToroBase):
     """A synchronization primitive that allows one task to wake up one or more others.
     It has a similar interface as :class:`threading.Event`.
 
+    # TODO: doc unlike threading.Event you can reliably know if it's set
+
     An Event object manages an internal flag that can be set to true with the
     :meth:`set` method and reset to false with the :meth:`clear` method. The :meth:`wait` method
     blocks until the flag is true.
@@ -332,6 +334,7 @@ class Event(ToroBase):
 class Queue(ToroBase):
     """
     TODO: doc from Gevent Queue
+    # TODO: doc unlike Queue.Queue you can reliably know its size
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
@@ -554,7 +557,6 @@ class JoinableQueue(Queue):
         self.unfinished_tasks += 1
         self._finished.clear()
 
-    # TODO: doc the callback
     def task_done(self, callback=None):
         """Indicate that a formerly enqueued task is complete. Used by queue consumers.
         For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to
@@ -607,6 +609,8 @@ class Semaphore(object):
     negative.
 
     If not given, value defaults to 1.
+
+    # TODO: doc unlike threading.Semaphore you can reliably know the counter value
 
     :Parameters:
       - `value`: An int, the initial value (default 1).
@@ -713,6 +717,7 @@ class BoundedSemaphore(Semaphore):
 
 class Lock(object):
     """# TODO: doc from Gevent or stdlib
+    # TODO: doc unlike threading.Lock you can reliably know if it's locked
 
     :Parameters:
       - `io_loop`: Optional custom IOLoop.
