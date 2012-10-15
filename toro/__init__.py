@@ -292,9 +292,6 @@ class Event(ToroBase):
         """Return ``True`` if and only if the internal flag is true."""
         return self._flag
 
-    isSet = is_set  # makes it a better drop-in replacement for threading.Event
-    ready = is_set  # makes it compatible with AsyncResult
-
     def set(self, callback=None):
         """Set the internal flag to ``True``. All waiters are awakened.
         Calls :meth:`wait` once the flag is true will not block.

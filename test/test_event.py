@@ -93,8 +93,6 @@ class TestEvent(unittest.TestCase):
         e = toro.Event()
         e.set()
         self.assertEqual(True, e.is_set())
-        self.assertEqual(True, e.isSet())
-        self.assertEqual(True, e.ready())
         st = time.time()
         result = yield gen.Task(e.wait, timeout=.01)
         duration = time.time() - st

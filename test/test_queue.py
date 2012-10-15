@@ -47,7 +47,7 @@ class QueueTest1(unittest.TestCase):
         self.t = _TriggerTask(trigger_func, trigger_args, trigger_kwargs)
         self.result = yield Task(block_func, *block_args, **block_kwargs)
         # If block_func returned before our thread made the call, we failed!
-        if not self.t.startedEvent.isSet():
+        if not self.t.startedEvent.is_set():
             self.fail("blocking function '%r' appeared not to block" %
                       block_func)
         callback(self.result)
@@ -73,7 +73,7 @@ class QueueTest1(unittest.TestCase):
             if self.t.isAlive():
                 self.fail("trigger function '%r' appeared to not return" %
                                  trigger_func)
-            if not self.t.startedEvent.isSet():
+            if not self.t.startedEvent.is_set():
                 self.fail("trigger thread ended but event never set")
 
     do_exceptional_blocking_test.__test__ = False # Hide from nose
