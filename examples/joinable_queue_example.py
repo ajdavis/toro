@@ -1,10 +1,111 @@
-import urlparse
 import HTMLParser
 import time
+import urlparse
 
 from tornado import httpclient, gen, ioloop
 
 import toro
+
+
+@gen.engine
+def spider(base_url, concurrency, callback):
+    """Download the page at base_url and any pages beneath it that it points to,
+    recursively. Don't allow more than `concurrency` simultaneous downloads.
+
+    This function demos two Toro classes: JoinableQueue and BoundedSemaphore.
+    The JoinableQueue is a work queue; it begins with only base_url and each
+    discovered URL is added to it. We wait for JoinableQueue.join() to complete
+    before exiting, this ensures that the function as a whole is over when all
+    URLs have been downloaded.
+
+    The BoundedSemaphore regulates concurrency. We block trying to decrement
+    the semaphore before each download, and increment it after each download
+    completes.
+    """
+    q = toro.JoinableQueue()
+    sem = toro.BoundedSemaphore(concurrency)
+
+    start = time.time()
+    fetched = set()
+
+    @gen.engine
+    def fetch_url(callback):
+        current_url = yield gen.Task(q.get)
+        try:
+            if current_url in fetched:
+                return
+
+            print 'fetching', current_url
+            fetched.add(current_url)
+            urls = yield gen.Task(get_links_from_url, current_url)
+
+            for new_url in urls:
+                # Only follow links beneath the base URL
+                if new_url.startswith(base_url):
+                    yield gen.Task(q.put, new_url)
+
+        finally:
+            q.task_done()
+
+            # callback is sem.release(), so releasing here frees a slot for the
+            # main loop in worker() to launch another fetch_url() task.
+            callback()
+
+    @gen.engine
+    def worker():
+        while True:
+            yield gen.Task(sem.acquire)
+            # Launch a subtask
+            fetch_url(callback=sem.release)
+
+    q.put(base_url)
+
+    # Start worker, then wait for the work queue to be empty.
+    worker()
+    yield gen.Task(q.join, timeout=300)
+
+    if q.unfinished_tasks:
+        print 'Timed out!'
+    else:
+        print 'Done in %d seconds, fetched %s URLs.' % (
+            time.time() - start, len(fetched))
+
+    # callback is loop.stop(), so this allows the whole program to exit.
+    callback()
+
+
+@gen.engine
+def get_links_from_url(url, callback):
+    """Download the page at `url` and parse it for links. Returned links have
+    had the fragment after `#` removed, and have been made absolute so, e.g.
+    the URL 'gen.html#tornado.gen.Task' becomes
+    'http://tornadoweb.org/documentation/gen.html'.
+    """
+    response = yield gen.Task(httpclient.AsyncHTTPClient().fetch, url)
+
+    if response.error:
+        print url, response.error
+        callback([])
+        return
+    else:
+        print 'fetched', url
+
+    try:
+        urls = [
+            urlparse.urljoin(url, remove_fragment(new_url))
+            for new_url in get_links(response.body)
+        ]
+
+        callback(urls)
+    except Exception, e:
+        print url, e
+        callback([])
+        return
+
+
+def remove_fragment(url):
+    scheme, netloc, url, params, query, fragment = urlparse.urlparse(url)
+    return urlparse.urlunparse((scheme, netloc, url, params, query, ''))
 
 
 def get_links(html):
@@ -21,68 +122,6 @@ def get_links(html):
     url_seeker = URLSeeker()
     url_seeker.feed(html)
     return url_seeker.urls
-
-
-def remove_fragment(url):
-    scheme, netloc, url, params, query, fragment = urlparse.urlparse(url)
-    return urlparse.urlunparse((scheme, netloc, url, params, query, ''))
-
-
-@gen.engine
-def spider(base_url, concurrency, callback):
-    start = time.time()
-    fetched = set()
-    q = toro.JoinableQueue()
-
-    @gen.engine
-    def fetch_url():
-        while True:
-            try:
-                current_url = yield gen.Task(q.get)
-                if current_url in fetched:
-                    continue
-
-                print 'fetching', current_url
-                fetched.add(current_url)
-                response = yield gen.Task(
-                    httpclient.AsyncHTTPClient().fetch, current_url)
-
-                if response.error:
-                    print current_url, response.error
-                    continue
-                else:
-                    print 'fetched', current_url
-
-                try:
-                    urls = get_links(response.body)
-                except Exception, e:
-                    print current_url, e
-                    raise StopIteration
-
-                for new_url in urls:
-                    absolute_url = urlparse.urljoin(current_url,
-                        remove_fragment(new_url))
-
-                    # Only follow links beneath the base URL
-                    if absolute_url.startswith(base_url):
-                        yield gen.Task(q.put, absolute_url)
-
-            finally:
-                q.task_done()
-
-    q.put(base_url)
-
-    # Start workers
-    for i in range(concurrency):
-        fetch_url()
-
-    yield gen.Task(q.join, timeout=300)
-    if q.unfinished_tasks:
-        print 'Timed out!'
-    else:
-        print 'Done in %d seconds, fetched %s URLs.' % (
-            time.time() - start, len(fetched))
-    callback()
 
 
 if __name__ == '__main__':
