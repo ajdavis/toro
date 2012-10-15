@@ -48,7 +48,7 @@ def spider(base_url, concurrency, callback):
                     httpclient.AsyncHTTPClient().fetch, current_url)
 
                 if response.error:
-                    print current_url, response.error, 'from', source_url
+                    print current_url, response.error
                     continue
                 else:
                     print 'fetched', current_url
@@ -56,7 +56,7 @@ def spider(base_url, concurrency, callback):
                 try:
                     urls = get_links(response.body)
                 except Exception, e:
-                    print current_url, e, 'from', source_url
+                    print current_url, e
                     raise StopIteration
 
                 for new_url in urls:
