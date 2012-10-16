@@ -1,65 +1,10 @@
-:mod:`toro`: Synchronization primitives for Tornado coroutines
-===============================================================
+:mod:`toro` Classes
+===================
 
 .. currentmodule:: toro
 
 .. contents:: Contents
-   :depth: 3
    :local:
-
-
-Classes
--------
-
-AsyncResult
-~~~~~~~~~~~
-.. autoclass:: AsyncResult
-  :members:
-
-Lock
-~~~~
-.. autoclass:: Lock
-  :members:
-
-Semaphore
-~~~~
-.. autoclass:: Semaphore
-  :members:
-
-BoundedSemaphore
-~~~~
-.. autoclass:: BoundedSemaphore
-  :members:
-
-Condition
-~~~~
-.. autoclass:: Condition
-  :members:
-
-Event
-~~~~
-.. autoclass:: Event
-  :members:
-
-Queue
-~~~~
-.. autoclass:: Queue
-  :members:
-
-PriorityQueue
-~~~~
-.. autoclass:: PriorityQueue
-  :members:
-
-LifoQueue
-~~~~
-.. autoclass:: LifoQueue
-  :members:
-
-JoinableQueue
-~~~~
-.. autoclass:: JoinableQueue
-  :members:
 
 Class relationships
 -------------------
@@ -73,15 +18,15 @@ has an :class:`Event`. (:class:`AsyncResult` stands alone.)
    digraph Toro {
        graph [splines=false];
        node [shape=record];
-       
-       // First show UML-style subclass relationships. 
+
+       // First show UML-style subclass relationships.
        edge [label=subclass arrowtail=empty arrowhead=none dir=both];
 
        Queue -> PriorityQueue
        Queue -> LifoQueue
        Queue -> JoinableQueue
        Semaphore -> BoundedSemaphore
-       
+
        // Now UML-style composition or has-a relationships.
        edge [label="has a" arrowhead=odiamond arrowtail=none];
 
@@ -91,3 +36,53 @@ has an :class:`Event`. (:class:`AsyncResult` stands alone.)
        Queue -> Semaphore
        Semaphore -> Lock
    }
+
+AsyncResult
+-----------
+.. autoclass:: AsyncResult
+  :members:
+
+Lock
+----
+.. autoclass:: Lock
+  :members:
+
+Semaphore
+---------
+.. autoclass:: Semaphore
+  :members:
+
+BoundedSemaphore
+----------------
+.. autoclass:: BoundedSemaphore
+  :members:
+
+Condition
+---------
+.. autoclass:: Condition
+  :members:
+
+Event
+-----
+.. autoclass:: Event
+  :members:
+
+Queue
+-----
+.. autoclass:: Queue
+  :members:
+
+PriorityQueue
+-------------
+.. autoclass:: PriorityQueue
+  :members:
+
+LifoQueue
+---------
+.. autoclass:: LifoQueue
+  :members:
+
+JoinableQueue
+-------------
+.. autoclass:: JoinableQueue
+  :members:

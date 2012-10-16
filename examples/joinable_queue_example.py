@@ -1,3 +1,21 @@
+"""A simple web-spider that crawls all the pages in http://tornadoweb.org.
+
+:meth:`spider` downloads the page at `base_url` and any pages it links to,
+recursively. It ignores pages that are not beneath `base_url` hierarchically.
+
+This function demos two Toro classes: :class:`~toro.JoinableQueue` and
+:class:`~toro.BoundedSemaphore`.
+The :class:`~toro.JoinableQueue` is a work queue; it begins with only
+`base_url`, and each discovered URL is added to it. We wait for
+:meth:`~toro.JoinableQueue.join` to complete before exiting. This ensures that
+the function as a whole ends when all URLs have been downloaded.
+
+The :class:`~toro.BoundedSemaphore` regulates concurrency. We block trying to
+decrement the semaphore before each download, and increment it after each
+download completes.
+"""
+
+# start-file
 import HTMLParser
 import time
 import urlparse
@@ -9,19 +27,6 @@ import toro
 
 @gen.engine
 def spider(base_url, concurrency, callback):
-    """Download the page at base_url and any pages beneath it that it points to,
-    recursively. Don't allow more than `concurrency` simultaneous downloads.
-
-    This function demos two Toro classes: JoinableQueue and BoundedSemaphore.
-    The JoinableQueue is a work queue; it begins with only base_url and each
-    discovered URL is added to it. We wait for JoinableQueue.join() to complete
-    before exiting, this ensures that the function as a whole is over when all
-    URLs have been downloaded.
-
-    The BoundedSemaphore regulates concurrency. We block trying to decrement
-    the semaphore before each download, and increment it after each download
-    completes.
-    """
     q = toro.JoinableQueue()
     sem = toro.BoundedSemaphore(concurrency)
 

@@ -1,13 +1,9 @@
-toro: Examples
-==============
+Examples
+========
 
 .. toctree::
-    lock
-    semaphore
-    boundedsemaphore
-    condition
-    event
-    queue
-    priorityqueue
-    lifoqueue
-    joinablequeue
+    event_example
+    joinable_queue_example
+
+
+.. todo: Lock example
