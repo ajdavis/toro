@@ -1,21 +1,9 @@
 import functools
 import os
 import time
-import traceback
 import types
-import sys
 
 from tornado import gen, ioloop
-
-
-class PuritanicalIOLoop(ioloop.IOLoop):
-    """
-    A loop that quits when it encounters an Exception.
-    """
-    def handle_callback_exception(self, callback):
-        exc_type, exc_value, tb = sys.exc_info()
-        traceback.print_tb(tb, file=sys.stderr)
-        raise exc_value
 
 
 def async_test_engine(timeout_sec=5):
@@ -40,7 +28,6 @@ or:
 
             def run(self):
                 loop = ioloop.IOLoop.instance()
-                assert isinstance(loop, PuritanicalIOLoop)
 
                 try:
                     super(AsyncTestRunner, self).run()
@@ -62,8 +49,7 @@ or:
             if hasattr(ioloop.IOLoop, '_instance'):
                 del ioloop.IOLoop._instance
 
-            loop = PuritanicalIOLoop()
-            loop.install()
+            loop = ioloop.IOLoop.instance()
 
             def on_timeout():
                 loop.stop()
