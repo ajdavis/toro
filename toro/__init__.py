@@ -152,19 +152,11 @@ class AsyncResult(ToroBase):
                 result += ' waiters[%s]' % len(self.waiters)
         return result + '>'
 
-    def set(self, value, callback=None):
-        """Set a value and wake up all the waiters.
-
-        :Parameters:
-          - `callback`: Optional callback taking no arguments, run after the
-            waiters.
-        """
+    def set(self, value):
+        """Set a value and wake up all the waiters."""
         if self._ready:
             raise AlreadySet
 
-        # We call _next_tick *before* waiter.run(). We want callback to run
-        # any waiters, but before any callbacks *they* schedule.
-        self._next_tick(callback)
         self.value = value
         self._ready = True
         waiters, self.waiters = self.waiters, []
@@ -236,18 +228,13 @@ class Condition(ToroBase):
         self.waiters.append(
             _Waiter(timeout, (), self.io_loop, callback))
 
-    def notify(self, n=1, callback=None):
+    def notify(self, n=1):
         """Wake up `n` waiters.
 
         :Parameters:
           - `n`: The number of waiters to awaken (default: 1)
-          - `callback`: Optional callback taking no arguments, run after the
-            waiters.
         """
-        # We call _next_tick *before* waiter.run(). We want the callback to run
-        # after the waiters, but before any callbacks *they* schedule.
         self._consume_timed_out_waiters()
-        self._next_tick(callback)
 
         waiters = [] # Waiters we plan to run right now
         while n and self.waiters:
@@ -259,14 +246,9 @@ class Condition(ToroBase):
         for waiter in waiters:
             waiter.run()
 
-    def notify_all(self, callback=None):
-        """Wake up all waiters.
-
-        :Parameters:
-          - `callback`: Optional callback taking no arguments, run after the
-            waiters.
-        """
-        self.notify(len(self.waiters), callback)
+    def notify_all(self):
+        """Wake up all waiters."""
+        self.notify(len(self.waiters))
 
 
 class Event(ToroBase):
@@ -294,16 +276,12 @@ class Event(ToroBase):
         """Return ``True`` if and only if the internal flag is true."""
         return self._flag
 
-    def set(self, callback=None):
+    def set(self):
         """Set the internal flag to ``True``. All waiters are awakened.
-        Calls :meth:`wait` once the flag is true will not block.
-
-        :Parameters:
-          - `callback`: Optional callback taking no arguments, run after the
-            waiters.
+        Calling :meth:`wait` once the flag is true will not block.
         """
         self._flag = True
-        self.condition.notify_all(callback)
+        self.condition.notify_all()
 
     def clear(self):
         """Reset the internal flag to ``False``. Subsequently, calls to :meth:`wait`
@@ -360,7 +338,8 @@ class Queue(ToroBase):
 
     def _put(self, item):
         self.queue.append(item)
-        
+
+    # TODO: refactor w/ Condition
     def _consume_expired_getters(self):
         while self.getters and self.getters[0].expired:
             self.getters.popleft()
@@ -557,7 +536,7 @@ class JoinableQueue(Queue):
         self.unfinished_tasks += 1
         self._finished.clear()
 
-    def task_done(self, callback=None):
+    def task_done(self):
         """Indicate that a formerly enqueued task is complete. Used by queue consumers.
         For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to
         :meth:`task_done` tells the queue that the processing on the task is complete.
@@ -567,14 +546,7 @@ class JoinableQueue(Queue):
         :meth:`put <Queue.put>` into the queue).
 
         Raises a :exc:`ValueError` if called more times than there were items placed in the queue.
-
-        :Parameters:
-          - `callback`: Optional callback taking no arguments, run after any
-            waiters.
         """
-        # We call _next_tick *before* waiter.run(). We want callback to run
-        # any waiters, but before any callbacks *they* schedule.
-        self._next_tick(callback)
         if self.unfinished_tasks <= 0:
             raise ValueError('task_done() called too many times')
         self.unfinished_tasks -= 1
@@ -643,19 +615,15 @@ class Semaphore(object):
         """True if :attr:`counter` is zero"""
         return self.q.empty()
 
-    def release(self, callback=None):
+    def release(self):
         """Increment :attr:`counter` and wake one waiter blocking on
         :meth:`acquire`.
-
-        :Parameters:
-          - `callback`: Optional callback taking no arguments, run after the
-            waiter.
         """
         self.q.put(None)
         # TODO: what if locked() is still True here, because there was a
-        # waiter for get() or because get() triggered a function that did
-        # another acquire()?
-        self._unlocked.set(callback)
+        #   waiter for get() or because get() triggered a function that did
+        #   another acquire()? This needs a lot of testing.
+        self._unlocked.set()
 
     def wait(self, callback, timeout=None):
         """Wait for :attr:`locked` to be False
@@ -709,10 +677,10 @@ class BoundedSemaphore(Semaphore):
         super(BoundedSemaphore, self).__init__(value, io_loop)
         self._initial_value = value
 
-    def release(self, callback=None):
+    def release(self):
         if self.counter >= self._initial_value:
             raise ValueError("Semaphore released too many times")
-        return super(BoundedSemaphore, self).release(callback)
+        return super(BoundedSemaphore, self).release()
 
 
 class Lock(object):
@@ -744,15 +712,10 @@ class Lock(object):
         """
         return self._block.acquire(callback, timeout)
 
-    def release(self, callback=None):
+    def release(self):
+        """TODO: doc
         """
-        TODO: doc
-
-        :Parameters:
-          - `callback`: Optional callback taking no arguments, run after the
-            waiter.
-        """
-        self._block.release(callback)
+        self._block.release()
 
     def locked(self):
         """``True`` if the lock has been acquired"""

@@ -713,17 +713,16 @@ class TestJoinableQueue3(unittest.TestCase):
 
     @async_test_engine()
     def test_queue_join_callback(self, done):
-        # Test that a callback passed to task_done() runs after callbacks
-        # registered with join()
+        # Test that callbacks passed to join() run immediately after task_done()
         q = toro.JoinableQueue()
         history = []
         q.put('foo')
         q.put('foo')
         q.join(make_callback('join', history))
-        q.task_done(make_callback('task_done1', history))
-        yield gen.Task(IOLoop.instance().add_callback) # Let task_done1 run
-        q.task_done(make_callback('task_done2', history))
-        yield gen.Task(IOLoop.instance().add_callback)
+        q.task_done()
+        history.append('task_done1')
+        q.task_done()
+        history.append('task_done2')
         self.assertEqual(['task_done1', 'join', 'task_done2'], history)
         done()
 

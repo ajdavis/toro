@@ -31,35 +31,16 @@ class TestCondition(unittest.TestCase):
         done()
 
     @async_test_engine()
-    def test_notify_1_callback(self, done):
-        # Test that a callback passed to noity() runs after callbacks
-        # registered with wait()
+    def test_notify_1(self, done):
         c = toro.Condition()
         history = []
         c.wait(make_callback('wait1', history))
         c.wait(make_callback('wait2', history))
-        c.notify(1, make_callback('notify1', history))
-
-        # Wait for next tick - meanwhile, notify1 runs
-        yield gen.Task(IOLoop.instance().add_callback)
-        c.notify(1, make_callback('notify2', history))
-        yield gen.Task(IOLoop.instance().add_callback)
+        c.notify(1)
+        history.append('notify1')
+        c.notify(1)
+        history.append('notify2')
         self.assertEqual(['wait1', 'notify1', 'wait2', 'notify2'], history)
-        done()
-
-    @async_test_engine()
-    def test_notify_1_callback(self, done):
-        # Test that a callback passed to noity_all() runs after callbacks
-        # registered with wait()
-        c = toro.Condition()
-        history = []
-        c.wait(make_callback('wait1', history))
-        c.wait(make_callback('wait2', history))
-        c.notify_all(make_callback('notify_all', history))
-
-        # Wait for next tick - meanwhile, notify_all runs
-        yield gen.Task(IOLoop.instance().add_callback)
-        self.assertEqual(['wait1', 'wait2', 'notify_all'], history)
         done()
 
     @async_test_engine()
@@ -69,13 +50,13 @@ class TestCondition(unittest.TestCase):
         for i in range(6):
             c.wait(make_callback(i, history))
 
-        yield gen.Task(c.notify, 3)
+        c.notify(3)
 
         # Callbacks execute in the order they were registered
         self.assertEqual(list(range(3)), history)
-        yield gen.Task(c.notify, 1)
+        c.notify(1)
         self.assertEqual(list(range(4)), history)
-        yield gen.Task(c.notify, 2)
+        c.notify(2)
         self.assertEqual(list(range(6)), history)
         done()
 
@@ -86,10 +67,13 @@ class TestCondition(unittest.TestCase):
         for i in range(4):
             c.wait(make_callback(i, history))
 
-        yield gen.Task(c.notify_all)
+        c.notify_all()
+        history.append('notify_all')
 
         # Callbacks execute in the order they were registered
-        self.assertEqual(list(range(4)), history)
+        self.assertEqual(
+            list(range(4)) + ['notify_all'],
+            history)
         done()
 
     @async_test_engine()
@@ -136,9 +120,9 @@ class TestCondition(unittest.TestCase):
         yield gen.Task(loop.add_timeout, st + .2)
         self.assertEqual([1], history)
 
-        yield gen.Task(c.notify, 2)
+        c.notify(2)
         self.assertEqual([1, 0, 2], history)
-        yield gen.Task(c.notify)
+        c.notify()
         self.assertEqual([1, 0, 2, 3], history)
         done()
 
@@ -157,7 +141,7 @@ class TestCondition(unittest.TestCase):
         yield gen.Task(loop.add_timeout, st + .2)
         self.assertEqual([1], history)
 
-        yield gen.Task(c.notify_all)
+        c.notify_all()
         self.assertEqual([1, 0, 2], history)
         done()
 

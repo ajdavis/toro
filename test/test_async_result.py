@@ -75,14 +75,14 @@ class TestAsyncResult(unittest.TestCase):
         done()
 
     @async_test_engine()
-    def test_set_callback(self, done):
-        # Test that a callback passed to set() runs after callbacks registered
-        # with get()
+    def test_get_callback(self, done):
+        # Test that callbacks registered with get() run immediately after set()
         result = toro.AsyncResult()
         history = []
         result.get(make_callback('get1', history))
         result.get(make_callback('get2', history))
-        result.set('foo', make_callback('set', history))
+        result.set('foo')
+        history.append('set')
         yield gen.Task(IOLoop.instance().add_callback)
         self.assertEqual(['get1', 'get2', 'set'], history)
         done()

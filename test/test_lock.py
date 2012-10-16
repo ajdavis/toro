@@ -40,7 +40,7 @@ class LockTests(unittest.TestCase):
         @gen.engine
         def f(callback):
             yield gen.Task(lock.acquire)
-            yield gen.Task(lock.release)
+            lock.release()
             callback()
 
         for i in range(N):
@@ -104,15 +104,13 @@ class LockTests2(unittest.TestCase):
         done()
 
     @async_test_engine()
-    def test_set_callback(self, done):
-        # Test that a callback passed to acquire() runs after callbacks
-        # registered with release()
+    def test_acquire_callback(self, done):
         lock = toro.Lock()
         history = []
         lock.acquire(make_callback('acquire1', history))
         lock.acquire(make_callback('acquire2', history))
-        lock.release(make_callback('release', history))
-        yield gen.Task(IOLoop.instance().add_callback)
+        lock.release()
+        history.append('release')
         self.assertEqual(['acquire1', 'acquire2', 'release'], history)
         done()
 

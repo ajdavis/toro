@@ -55,15 +55,15 @@ class TestEvent(unittest.TestCase):
         done()
 
     @async_test_engine()
-    def test_set_callback(self, done):
+    def test_get_callback(self, done):
         # Test that a callback passed to set() runs after callbacks registered
         # with wait()
         e = toro.Event()
         history = []
         e.wait(make_callback('wait1', history))
         e.wait(make_callback('wait2', history))
-        e.set(make_callback('set', history))
-        yield gen.Task(IOLoop.instance().add_callback)
+        e.set()
+        history.append('set')
         self.assertEqual(['wait1', 'wait2', 'set'], history)
         done()
 

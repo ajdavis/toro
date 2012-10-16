@@ -236,19 +236,19 @@ class TestTimeoutAcquire(unittest.TestCase):
 # Not adapted from Gevent's tests, specific to Toro
 class SemaphoreTests2(unittest.TestCase):
     @async_test_engine()
-    def test_release_callback(self, done):
-        # Test that a callback passed to release() runs after callbacks
-        # registered with acquire()
+    def test_acquire_callback(self, done):
+        # Test that callbacks passed to acquire() run immediately after
+        # release()
         sem = toro.Semaphore(0)
         history = []
         sem.acquire(make_callback('acquire1', history))
         sem.acquire(make_callback('acquire2', history))
         sem.wait(make_callback('wait1', history))
         sem.wait(make_callback('wait2', history))
-        sem.release(make_callback('release1', history))
-        yield gen.Task(IOLoop.instance().add_callback)
-        sem.release(make_callback('release2', history))
-        yield gen.Task(IOLoop.instance().add_callback)
+        sem.release()
+        history.append('release1')
+        sem.release()
+        history.append('release2')
         self.assertEqual([
                 # First release wakes first acquire plus all waits
                 'acquire1', 'wait1', 'wait2', 'release1',
