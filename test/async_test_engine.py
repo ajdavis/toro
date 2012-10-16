@@ -71,21 +71,22 @@ or:
 
             timeout = loop.add_timeout(time.time() + timeout_sec, on_timeout)
 
-            gen = func(self, done)
-            if isinstance(gen, types.GeneratorType):
-                runner = AsyncTestRunner(gen, timeout)
-                runner.run()
-                loop.start()
+            try:
+                gen = func(self, done)
+                if isinstance(gen, types.GeneratorType):
+                    runner = AsyncTestRunner(gen, timeout)
+                    runner.run()
+                    loop.start()
 
+                    if not runner.finished:
+                        # Something stopped the loop before func could finish or throw
+                        # an exception.
+                        raise Exception('%s did not finish' % func)
+
+                if not is_done[0]:
+                    raise Exception('%s did not call done()' % func)
+            finally:
                 del ioloop.IOLoop._instance # Uninstall
-
-                if not runner.finished:
-                    # Something stopped the loop before func could finish or throw
-                    # an exception.
-                    raise Exception('%s did not finish' % func)
-
-            if not is_done[0]:
-                raise Exception('%s did not call done()' % func)
 
         return _async_test
     return decorator
