@@ -34,10 +34,9 @@ copyright = u'2012 A. Jesse Jiryu Davis'
 # built documents.
 #
 # The short X.Y version.
-# TODO:
-version = '0.1'
+version = toro.version
 # The full version, including alpha/beta/rc tags.
-release = '0.1'
+release = toro.version
 
 # List of documents that shouldn't be included in the build.
 unused_docs = []
