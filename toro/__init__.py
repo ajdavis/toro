@@ -1,6 +1,5 @@
 # TODO: check against API at http://www.gevent.org/gevent.queue.html#module-gevent.queue
 #   and emulate the example at its bottom in my docs
-# TODO: note that altering maxsize doesn't unlock putters as it should
 # TODO: check on Gevent's licensing
 # TODO: review reprs and __str__'s
 # TODO: did I omit Gevent tests from the 2.7/ dir?
