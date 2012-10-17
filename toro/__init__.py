@@ -1,6 +1,5 @@
 # TODO: check against API at http://www.gevent.org/gevent.queue.html#module-gevent.queue
 #   and emulate the example at its bottom in my docs
-# TODO: doc! mostly copy Gevent's
 # TODO: note that altering maxsize doesn't unlock putters as it should
 # TODO: check on Gevent's licensing
 # TODO: review reprs and __str__'s
@@ -321,13 +320,32 @@ class Event(ToroBase):
 
 
 class Queue(ToroBase):
-    """
-    TODO: doc from Gevent Queue
-    # TODO: doc unlike Queue.Queue you can reliably know its size
+    """Create a queue object with a given maximum size.
+
+    If `maxsize` is ``None`` (the default) the queue size is unbounded.
+
+    ``Queue(0)`` is a channel, that is, its :meth:`put` method always blocks until the
+    item is delivered. (This emulates `Gevent's Queue`_, but is unlike the
+    `standard Queue`_, where 0 means infinite size).
+
+    Also unlike the `standard Queue`_, you can reliably know this Queue's
+    size with :meth:`qsize`, since your single-threaded Tornado application won't
+    be interrupted between calling :meth:`qsize` and doing an operation on the
+    Queue.
+
+    .. warning:: Although :attr:`maxsize` is mutable, increasing it does not
+      automatically unblock functions waiting to :meth:`put <Queue.put>` items.
+      This is a bug.
+
+    .. todo:: Fix it.
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
       - `io_loop`: Optional custom IOLoop.
+
+    .. _`Gevent's Queue`: http://www.gevent.org/gevent.queue.html
+
+    .. _`standard Queue`: http://docs.python.org/library/queue.html#Queue.Queue
     """
     def __init__(self, maxsize=None, io_loop=None):
         super(Queue, self).__init__(io_loop)
