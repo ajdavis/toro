@@ -36,6 +36,7 @@ __all__ = [
 
     # Classes
     'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
+    'Lock',
 
     # Queue classes
     'Queue', 'PriorityQueue', 'LifoQueue', 'JoinableQueue'
