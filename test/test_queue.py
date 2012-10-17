@@ -525,7 +525,7 @@ class TestQueue3(unittest.TestCase):
         global_loop = IOLoop.instance()
         custom_loop = IOLoop()
         self.assertNotEqual(global_loop, custom_loop)
-        q = toro.Queue(None, custom_loop)
+        q = toro.Queue(None, io_loop=custom_loop)
 
         def callback(v):
             assert v == 'foo'
@@ -757,7 +757,7 @@ class TestJoinableQueue3(unittest.TestCase):
 
 class TestQueueCommon(unittest.TestCase, BaseToroCommonTest):
     def toro_object(self, io_loop=None):
-        return toro.Queue(io_loop)
+        return toro.Queue(io_loop=io_loop)
 
     def notify(self, toro_object, value):
         toro_object.put(value)

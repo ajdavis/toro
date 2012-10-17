@@ -336,13 +336,14 @@ class Queue(ToroBase):
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
+      - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
 
     .. _`Gevent's Queue`: http://www.gevent.org/gevent.queue.html
 
     .. _`standard Queue`: http://docs.python.org/library/queue.html#Queue.Queue
     """
-    def __init__(self, maxsize=None, io_loop=None):
+    def __init__(self, maxsize=None, initial=None, io_loop=None):
         super(Queue, self).__init__(io_loop)
         if maxsize is not None and maxsize < 0:
             raise ValueError("maxsize can't be negative")
@@ -352,10 +353,10 @@ class Queue(ToroBase):
         self.getters = collections.deque([])
         # Pairs of (item, _Waiter)
         self.putters = collections.deque([])
-        self._init(maxsize)
+        self._init(maxsize, initial)
 
-    def _init(self, maxsize):
-        self.queue = collections.deque()
+    def _init(self, maxsize, initial):
+        self.queue = collections.deque(initial or [])
 
     def _get(self):
         return self.queue.popleft()
@@ -503,10 +504,11 @@ class PriorityQueue(Queue):
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
+      - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
-    def _init(self, maxsize):
-        self.queue = []
+    def _init(self, maxsize, initial):
+        self.queue = list(initial or [])
 
     def _put(self, item, heappush=heapq.heappush):
         heappush(self.queue, item)
@@ -521,10 +523,11 @@ class LifoQueue(Queue):
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
+      - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
-    def _init(self, maxsize):
-        self.queue = []
+    def _init(self, maxsize, initial):
+        self.queue = list(initial or [])
 
     def _put(self, item):
         self.queue.append(item)
@@ -539,6 +542,7 @@ class JoinableQueue(Queue):
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
+      - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
     def __init__(self, maxsize=None, io_loop=None):
@@ -617,10 +621,7 @@ class Semaphore(object):
             raise ValueError("semaphore initial value must be >= 0")
 
         # The semaphore is implemented as a Queue with 'value' objects
-        # TODO: init queue with sequence
-        self.q = Queue(None, io_loop)
-        for i in range(value):
-            self.q.put(None)
+        self.q = Queue(None, [None] * value, io_loop)
 
         self._unlocked = Event(io_loop)
         if value:
