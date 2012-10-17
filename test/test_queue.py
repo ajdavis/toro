@@ -157,7 +157,6 @@ class TestJoinableQueue1(unittest.TestCase):
     def test_queue_task_done(self):
         # Test to make sure a queue task completed successfully.
         q = toro.JoinableQueue()
-        # XXX the same test in subclasses
         try:
             q.task_done()
         except ValueError:
