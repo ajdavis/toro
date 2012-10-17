@@ -10,7 +10,6 @@
 # TODO: document dependencies: Lock -> Semaphore -> Condition, and so on
 import heapq
 import logging
-import time
 import collections
 from functools import partial
 from Queue import Full, Empty
