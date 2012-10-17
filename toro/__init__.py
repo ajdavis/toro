@@ -5,7 +5,6 @@
 # TODO: did I omit Gevent tests from the 2.7/ dir?
 # TODO: for non-blocking wait() acquire() etc. that don't raise exceptions,
 #   warn vehemently that they won't block and you must check return value!
-# TODO: document dependencies: Lock -> Semaphore -> Condition, and so on
 import heapq
 import logging
 import collections
