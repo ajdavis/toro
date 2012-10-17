@@ -115,6 +115,12 @@ class LockTests2(unittest.TestCase):
         self.assertEqual(['acquire1', 'acquire2', 'release'], history)
         done()
 
+    def test_multi_release(self):
+        lock = toro.Lock()
+        lock.acquire()
+        lock.release()
+        self.assertRaises(RuntimeError, lock.release)
+
 
 class TestLockCommon(unittest.TestCase, BaseToroCommonTest):
     def toro_object(self, io_loop=None):
