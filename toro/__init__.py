@@ -10,9 +10,6 @@
 # TODO: we may need to do serious thinking about exceptions and Tornado
 #   StackContexts and get some input from bdarnell
 # TODO: document dependencies: Lock -> Semaphore -> Condition, and so on
-# TODO: NOTE that while Tornado's "timeout" parameters are seconds
-#   since epoch, this timeout is seconds from **now**, consistent
-#   with threading.Condition
 import heapq
 import logging
 import time
@@ -95,19 +92,19 @@ class ToroBase(object):
 
 class _Waiter(ToroBase):
     """Internal Toro utility class"""
-    def __init__(self, timeout, timeout_args, io_loop, callback):
+    def __init__(self, deadline, timeout_args, io_loop, callback):
         """
-        Create a deferred callback. If timeout is not None, it's the number of
-        seconds in the future at which to time-out this waiter. Note that
-        timeout is seconds into the future, not a "deadline" in Unix timestamp
-        as in Tornado. callback(*timeout_args) is executed after the timeout.
+        Create a deferred callback. If deadline is not None, it may be a number
+        denoting a unix timestamp (as returned by `time.time()`) or a
+        `datetime.timedelta` object for a deadline relative to the current time.
+        callback(*timeout_args) is executed after a timeout.
+
         Waiters are only ever executed once.
         """
         super(_Waiter, self).__init__(io_loop)
         _check_callback(callback)
-        if timeout is not None:
-            self.io_loop.add_timeout(
-                time.time() + timeout, partial(self.run, *timeout_args))
+        if deadline is not None:
+            self.io_loop.add_timeout(deadline, partial(self.run, *timeout_args))
 
         # Capture the current stack context so it's restored when we're run
         # after deferral.
@@ -174,7 +171,7 @@ class AsyncResult(ToroBase):
     def ready(self):
         return self._ready
 
-    def get(self, callback=None, timeout=None):
+    def get(self, callback=None, deadline=None):
         """Get a value now or after :meth:`set` is called. If called without a
         callback, returns the value or raises :exc:`NotReady`. If called
         with a callback, passes the value to the callback on the next iteration
@@ -183,7 +180,9 @@ class AsyncResult(ToroBase):
         :Parameters:
           - `callback`: Optional callback taking one argument, this
             AsyncResult's value. Receives ``None`` after a timeout.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
         if self.ready():
             if not callback:
@@ -197,7 +196,7 @@ class AsyncResult(ToroBase):
 
             # After timeout, callback will be passed None
             self.waiters.append(
-                _Waiter(timeout, (None,), self.io_loop, callback))
+                _Waiter(deadline, (None,), self.io_loop, callback))
 
 
 # TODO: Note we don't have or need acquire() and release()
@@ -223,18 +222,20 @@ class Condition(ToroBase):
         while self.waiters and self.waiters[0].expired:
             self.waiters.popleft()
 
-    def wait(self, callback=None, timeout=None):
+    def wait(self, callback=None, deadline=None):
         """Register a callback to be executed after :meth:`notify`.
 
-        .. note:: If you set a timeout, there is no way to determine whether
+        .. note:: If you set a deadline, there is no way to determine whether
            `callback` was run because of a notify or a timeout.
 
         :Parameters:
           - `callback`: Function taking no arguments.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
         self.waiters.append(
-            _Waiter(timeout, (), self.io_loop, callback))
+            _Waiter(deadline, (), self.io_loop, callback))
 
     def notify(self, n=1):
         """Wake up `n` waiters.
@@ -297,11 +298,11 @@ class Event(ToroBase):
         """
         self._flag = False
 
-    def wait(self, callback, timeout=None):
+    def wait(self, callback, deadline=None):
         """Block until the internal flag is true.
         If the flag is already true, the callback is run immediately.
-        Otherwise, block until another task calls :meth:`set` to set the flag
-        to true, or until the optional timeout occurs.
+        Otherwise, block until the deadline, or until another task calls
+        :meth:`set` to set the flag to true.
 
         .. note:: If you set a timeout, you can determine whether
            `callback` was run because of a :meth:`set` or a timeout by checking
@@ -309,12 +310,14 @@ class Event(ToroBase):
 
         :Parameters:
           - `callback`: Function taking no arguments.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
         if self._flag:
             self._next_tick(callback)
         else:
-            self.condition.wait(callback, timeout)
+            self.condition.wait(callback, deadline)
 
 
 class Queue(ToroBase):
@@ -393,26 +396,25 @@ class Queue(ToroBase):
         else:
             return self.qsize() == self.maxsize
 
-    def put(self, item, callback=None, timeout=None):
+    def put(self, item, callback=None, deadline=None):
         """Put an item into the queue.
 
         # TODO: update, 'block' isn't exactly the right term
-        If optional arg *block* is true and *timeout* is ``None`` (the default),
-        block if necessary until a free slot is available. If *timeout* is
-        a positive number, it blocks at most *timeout* seconds and raises
-        the :exc:`Queue.Full` exception if no free slot was available within that time.
+        If optional arg *block* is true and *deadline* is ``None`` (the default),
+        block if necessary until a free slot is available. If *deadline* is
+        a timestamp or timedelta, it blocks until the deadline and raises
+        :exc:`Queue.Full` if no free slot becomes available.
         Otherwise (*block* is false), put an item on the queue if a free slot
-        is immediately available, else raise the :class:`Full` exception (*timeout*
+        is immediately available, else raise the :class:`Full` exception (*deadline*
         is ignored in that case).
 
         :Parameters:
           - `callback`: Optional callback taking no arguments, run after the
             waiter.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
-        # TODO: NOTE that while Tornado's "timeout" parameters are seconds
-        #   since epoch, this timeout is seconds from **now**, consistent
-        #   with Queue.Queue and Gevent's Queue
         self._consume_expired_getters()
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
@@ -432,7 +434,7 @@ class Queue(ToroBase):
             def _callback(success):
                 self.io_loop.add_callback(partial(callback, success))
 
-            waiter = _Waiter(timeout, (False,), self.io_loop, _callback)
+            waiter = _Waiter(deadline, (False,), self.io_loop, _callback)
             self.putters.append((item, waiter))
         elif self.maxsize == self.qsize():
             raise Full
@@ -440,7 +442,7 @@ class Queue(ToroBase):
             self._put(item)
             self._next_tick(callback, True)
 
-    def get(self, callback=None, timeout=None):
+    def get(self, callback=None, deadline=None):
         """Remove and return an item from the queue.
 
         # TODO: update
@@ -453,11 +455,10 @@ class Queue(ToroBase):
 
         :Parameters:
           - `callback`: Optional callback one argument.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
-        # TODO: NOTE that while Tornado's "timeout" parameters are seconds
-        #   since epoch, this timeout is seconds from **now**, consistent
-        #   with Queue.Queue and Gevent's Queue
         self._consume_expired_putters()
         if self.putters:
             assert self.full(), "queue not full, why are putters waiting?"
@@ -476,7 +477,7 @@ class Queue(ToroBase):
                 return self._get()
         elif callback:
             self.getters.append(
-                _Waiter(timeout, (Empty,), self.io_loop, callback))
+                _Waiter(deadline, (Empty,), self.io_loop, callback))
         else:
             raise Empty
 
@@ -561,7 +562,7 @@ class JoinableQueue(Queue):
         if self.unfinished_tasks == 0:
             self._finished.set()
 
-    def join(self, callback, timeout=None):
+    def join(self, callback, deadline=None):
         """Block until all items in the queue have been gotten and processed.
 
         The count of unfinished tasks goes up whenever an item is added to the queue.
@@ -569,18 +570,20 @@ class JoinableQueue(Queue):
         that the item was retrieved and all work on it is complete. When the count of
         unfinished tasks drops to zero, :meth:`join` unblocks.
 
-        If timeout is not None, the callback may be executed before all tasks
+        If `deadline` is not None, the callback may be executed before all tasks
         are complete. Check the value of unfinished_tasks after a join() with a
-        timeout to determine if this has happened.
+        deadline to determine if this has happened.
 
         :Parameters:
           - `callback`: Function taking no arguments.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
         if self.unfinished_tasks == 0:
             self._next_tick(callback)
         else:
-            self._finished.wait(callback, timeout)
+            self._finished.wait(callback, deadline)
 
 
 class Semaphore(object):
@@ -633,20 +636,22 @@ class Semaphore(object):
         #   another acquire()? This needs a lot of testing.
         self._unlocked.set()
 
-    def wait(self, callback, timeout=None):
+    def wait(self, callback, deadline=None):
         """Wait for :attr:`locked` to be False
 
-        .. note:: If you set a timeout, you can determine whether
+        .. note:: If you set a deadline, you can determine whether
            `callback` was run because of a :meth:`release` or a timeout by
            checking :meth:`locked`.
 
         :Parameters:
           - `callback`: Function taking no arguments.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
-        self._unlocked.wait(callback, timeout)
+        self._unlocked.wait(callback, deadline)
 
-    def acquire(self, callback=None, timeout=None):
+    def acquire(self, callback=None, deadline=None):
         """If a callback is passed, then decrement :attr:`counter` and run
         the callback. If the counter is zero, wait for a
         :meth:`release` or a timeout before running the callback.
@@ -658,15 +663,19 @@ class Semaphore(object):
            `callback` was run because of a :meth:`release` or a timeout by
            checking :meth:`locked`.
 
+        .. todo:: Correct?
+
         :Parameters:
           - `callback`: Optional function taking no arguments.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
         if callback:
             _check_callback(callback)
             # The Queue will return Empty on timeout, else None. Transform
             # those values into False or True.
-            self.q.get(lambda value: callback(value is not Empty), timeout)
+            self.q.get(lambda value: callback(value is not Empty), deadline)
         else:
             try:
                 self.q.get()
@@ -706,19 +715,23 @@ class Lock(object):
             self.__class__.__name__,
             self._block)
 
-    def acquire(self, callback=None, timeout=None):
+    def acquire(self, callback=None, deadline=None):
         """
         TODO: doc
 
-        .. note:: If you set a timeout, you can determine whether
+        .. note:: If you set a deadline, you can determine whether
            `callback` was run because of a :meth:`release` or a timeout by
            checking :meth:`locked`.
 
+        .. todo:: Correct?
+
         :Parameters:
           - `callback`: Function taking no arguments.
-          - `timeout`: Optional timeout, seconds from now.
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by `time.time()`) or a `datetime.timedelta` for a
+            deadline relative to the current time.
         """
-        return self._block.acquire(callback, timeout)
+        return self._block.acquire(callback, deadline)
 
     def release(self):
         """TODO: doc

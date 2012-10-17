@@ -4,6 +4,7 @@ Test toro.Lock.
 Adapted from Gevent's lock_tests.py.
 """
 
+from datetime import timedelta
 import time
 import unittest
 
@@ -96,7 +97,7 @@ class LockTests2(unittest.TestCase):
         self.assertTrue(lock.acquire())
         self.assertTrue(lock.locked())
         st = time.time()
-        result = yield gen.Task(lock.acquire, timeout=.01)
+        result = yield gen.Task(lock.acquire, deadline=timedelta(seconds=.01))
         self.assertFalse(result)
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
@@ -127,5 +128,5 @@ class TestLockCommon(unittest.TestCase, BaseToroCommonTest):
     def notify(self, toro_object, value):
         toro_object.release()
 
-    def wait(self, toro_object, callback):
-        toro_object.acquire(callback)
+    def wait(self, toro_object, callback, deadline):
+        toro_object.acquire(callback, deadline)

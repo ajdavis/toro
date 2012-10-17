@@ -15,13 +15,23 @@ toro: Synchronization primitives for Tornado coroutines
 The Wait / Notify Pattern
 -------------------------
 
-E.g. Condition.wait(callback, timeout)
+E.g. Condition.wait(callback, deadline)
 
 Sometimes you get a value telling you what happened, other times there's
 no change of state, other times you need to check the original object to
 see what happened
 
 .. todo:: fix that inconsistency?!
+
+`deadline` is either an absolute timestamp as a Unix timestamp::
+
+    # Wait up to 1 second for a notification
+    yield gen.Task(cond.wait, deadline=time.time() + 1)
+
+...or `datetime.timedelta` for a deadline relative to the current time::
+
+    # Wait up to 1 second
+    yield gen.Task(cond.wait, deadline=time.time() + datetime.timedelta(seconds=1))
 
 E.g. Condition.notify(callback), optionally resuming after waiters are
 awakened

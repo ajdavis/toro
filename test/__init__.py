@@ -1,7 +1,9 @@
+from datetime import timedelta
 import time
 
-from tornado import stack_context
+from tornado import stack_context, gen
 from tornado.ioloop import IOLoop
+from test.async_test_engine import async_test_engine
 
 
 def make_callback(key, history):
@@ -17,8 +19,23 @@ class BaseToroCommonTest(object):
     def notify(self, toro_object, value):
         raise NotImplementedError()
 
-    def wait(self, toro_object, callback):
+    def wait(self, toro_object, callback, deadline):
         raise NotImplementedError()
+
+    @async_test_engine()
+    def test_deadline(self, done):
+        # Test that the wait method can take either timedelta since now or
+        # seconds since epoch
+        toro_object = self.toro_object()
+
+        start = time.time()
+        yield gen.Task(self.wait, toro_object, deadline=time.time() + .01)
+        self.assertAlmostEqual(time.time() - start, .01, places=2)
+
+        start = time.time()
+        yield gen.Task(self.wait, toro_object, deadline=timedelta(seconds=.01))
+        self.assertAlmostEqual(time.time() - start, .01, places=2)
+        done()
 
     def test_exc(self):
         # Test that raising an exception from a wait callback doesn't
@@ -51,7 +68,7 @@ class BaseToroCommonTest(object):
             outcomes['wait_result_exc'] = type
 
         with stack_context.ExceptionStackContext(catch_wait_result_exception):
-            self.wait(toro_object, wait_callback)
+            self.wait(toro_object, wait_callback, None)
 
         loop.add_timeout(time.time() + .01, notify)
         loop.start()
@@ -91,7 +108,7 @@ class BaseToroCommonTest(object):
             outcomes['notify_exc'] = type
             return True
 
-        self.wait(toro_object, wait_callback)
+        self.wait(toro_object, wait_callback, None)
         loop.add_timeout(time.time() + .01, notify)
         loop.start()
         self.assertTrue(outcomes['wait_callback_executed'])
@@ -109,7 +126,7 @@ class BaseToroCommonTest(object):
         def callback(value=None):
             custom_loop.stop()
 
-        self.wait(toro_object, callback)
+        self.wait(toro_object, callback, None)
         self.notify(toro_object, 'value')
 
         # If this completes, we know that wait and notify used the right loop

@@ -8,6 +8,7 @@ There are three sections, one each for tests that are
 3. written specifically for Toro.
 """
 
+from datetime import timedelta
 import time
 import unittest
 from Queue import Empty, Full
@@ -105,11 +106,13 @@ class QueueTest1(unittest.TestCase):
             pass
 
         # False is passed to the put() callback if it times out
-        self.assertFalse((yield Task(q.put, "full", timeout=0.01)))
+        self.assertFalse((yield Task(
+            q.put, "full", deadline=timedelta(seconds=0.01))))
         self.assertEquals(q.qsize(), QUEUE_SIZE)
         # Test a blocking put
         yield Task(self.do_blocking_test, q.put, ("full",), {}, q.get, (), {})
-        yield Task(self.do_blocking_test, q.put, ("full",), {'timeout': 10}, q.get, (), {})
+        yield Task(self.do_blocking_test, q.put,
+            ("full",), {'deadline': timedelta(seconds=10)}, q.get, (), {})
         # Empty it
         for i in range(QUEUE_SIZE):
             q.get()
@@ -120,10 +123,12 @@ class QueueTest1(unittest.TestCase):
         except Empty:
             pass
         # Empty is passed to the get() callback if it times out
-        self.assertEqual(Empty, (yield Task(q.get, timeout=0.01)))
+        self.assertEqual(Empty, (yield Task(
+            q.get, deadline=timedelta(seconds=0.01))))
         # Test a blocking get
         yield Task(self.do_blocking_test, q.get, (), {}, q.put, ('empty',), {})
-        yield Task(self.do_blocking_test, q.get, (), {'timeout': 10}, q.put, ('empty',), {})
+        yield Task(self.do_blocking_test, q.get,
+            (), {'deadline': timedelta(seconds=10)}, q.put, ('empty',), {})
         callback()
 
     simple_queue_test.__test__ = False # Hide from nose
@@ -538,18 +543,21 @@ class TestQueueTimeouts3(unittest.TestCase):
 
         # Empty Queue returns Empty if get() times out
         st = time.time()
-        self.assertEqual(Empty, (yield Task(q.get, timeout=.01)))
+        self.assertEqual(
+            Empty, (yield Task(q.get, deadline=timedelta(seconds=.01))))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
 
         # Make sure that putting and getting a value returns Queue to initial
         # state
         q.put(1)
-        self.assertEqual(1, (yield Task(q.get, timeout=.01)))
+        self.assertEqual(
+            1, (yield Task(q.get, deadline=timedelta(seconds=.01))))
 
         # Queue *still* returns Empty if get() times out
         st = time.time()
-        self.assertEqual(Empty, (yield Task(q.get, timeout=.01)))
+        self.assertEqual(
+            Empty, (yield Task(q.get, deadline=timedelta(seconds=.01))))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
         done()
@@ -561,18 +569,21 @@ class TestQueueTimeouts3(unittest.TestCase):
 
         # Full Queue returns False if put() times out
         st = time.time()
-        self.assertEqual(False, (yield Task(q.put, 2, timeout=.01)))
+        self.assertEqual(
+            False, (yield Task(q.put, 2, deadline=timedelta(seconds=.01))))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
 
         # Make sure that getting and putting a value returns Queue to initial
         # state
         self.assertEqual(1, q.get())
-        self.assertEqual(True, (yield Task(q.put, 1, timeout=.01)))
+        self.assertEqual(
+            True, (yield Task(q.put, 1, deadline=timedelta(seconds=.01))))
 
         # Full Queue *still* returns False if put() times out
         st = time.time()
-        self.assertEqual(False, (yield Task(q.put, 2, timeout=.01)))
+        self.assertEqual(
+            False, (yield Task(q.put, 2, deadline=timedelta(seconds=.01))))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
         done()
@@ -584,12 +595,13 @@ class TestQueueCallbackExceptions3(unittest.TestCase):
     exceptions
     """
     @gen.engine
-    def _test_exceptional_get_callback(self, qsize, timeout, callback):
+    def _test_exceptional_get_callback(self, qsize, deadline, callback):
         q = toro.Queue(qsize)
         while q.qsize() < qsize:
             q.put(None)
 
-        q.put(1, callback=(yield gen.Callback('put')), timeout=timeout) # Block
+        # Block
+        q.put(1, callback=(yield gen.Callback('put')), deadline=deadline)
         q.get(bad_get_callback)
 
         # Put should complete anyway
@@ -598,9 +610,10 @@ class TestQueueCallbackExceptions3(unittest.TestCase):
         callback()
 
     @gen.engine
-    def _test_exceptional_put_callback(self, qsize, timeout, callback):
+    def _test_exceptional_put_callback(self, qsize, deadline, callback):
         q = toro.Queue(qsize)
-        q.get(callback=(yield gen.Callback('get')), timeout=timeout) # Block
+
+        q.get(callback=(yield gen.Callback('get')), deadline=deadline) # Block
         q.put(1, bad_put_callback)
 
         # Get should complete anyway
@@ -615,7 +628,8 @@ class TestQueueCallbackExceptions3(unittest.TestCase):
 
     @async_test_engine()
     def test_exceptional_get_callback_timeout(self, done):
-        yield Task(self._test_exceptional_get_callback, 10, .01)
+        deadline = timedelta(seconds=0.1)
+        yield Task(self._test_exceptional_get_callback, 10, deadline)
         done()
 
     @async_test_engine()
@@ -625,7 +639,8 @@ class TestQueueCallbackExceptions3(unittest.TestCase):
 
     @async_test_engine()
     def test_channel_exceptional_get_callback_timeout(self, done):
-        yield Task(self._test_exceptional_get_callback, 0, .01)
+        deadline = timedelta(seconds=0.1)
+        yield Task(self._test_exceptional_get_callback, 0, deadline)
         done()
 
     @async_test_engine()
@@ -635,7 +650,8 @@ class TestQueueCallbackExceptions3(unittest.TestCase):
 
     @async_test_engine()
     def test_exceptional_put_callback_timeout(self, done):
-        yield Task(self._test_exceptional_put_callback, 10, .01)
+        deadline = timedelta(seconds=0.1)
+        yield Task(self._test_exceptional_put_callback, 10, deadline)
         done()
 
     @async_test_engine()
@@ -645,7 +661,8 @@ class TestQueueCallbackExceptions3(unittest.TestCase):
 
     @async_test_engine()
     def test_channel_exceptional_put_callback_timeout(self, done):
-        yield Task(self._test_exceptional_put_callback, 0, .01)
+        deadline = timedelta(seconds=0.1)
+        yield Task(self._test_exceptional_put_callback, 0, deadline)
         done()
 
     def test_stack_context(self):
@@ -731,7 +748,7 @@ class TestJoinableQueue3(unittest.TestCase):
         q = toro.JoinableQueue()
         q.put(1)
         st = time.time()
-        yield Task(q.join, timeout=.01)
+        yield Task(q.join, deadline=timedelta(seconds=.01))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertEqual(1, q.unfinished_tasks)
@@ -745,5 +762,5 @@ class TestQueueCommon(unittest.TestCase, BaseToroCommonTest):
     def notify(self, toro_object, value):
         toro_object.put(value)
 
-    def wait(self, toro_object, callback):
-        toro_object.get(callback)
+    def wait(self, toro_object, callback, deadline):
+        toro_object.get(callback, deadline)

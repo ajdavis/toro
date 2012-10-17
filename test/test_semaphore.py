@@ -4,6 +4,7 @@ Test toro.Semaphore.
 Adapted from Gevent's lock_tests.py and test__semaphore.py.
 """
 
+from datetime import timedelta
 import unittest
 import time
 import sys
@@ -214,7 +215,7 @@ class TestTimeoutAcquire(unittest.TestCase):
     @async_test_engine()
     def test_acquire_returns_false_after_timeout(self, done):
         s = toro.Semaphore(value=0)
-        result = yield gen.Task(s.acquire, timeout=0.01)
+        result = yield gen.Task(s.acquire, deadline=timedelta(seconds=0.01))
 
         # result can't be None, only precisely False
         self.assertTrue(result is False)
@@ -266,5 +267,5 @@ class TestSemaphoreCommon(unittest.TestCase, BaseToroCommonTest):
     def notify(self, toro_object, value):
         toro_object.release()
 
-    def wait(self, toro_object, callback):
-        toro_object.wait(callback)
+    def wait(self, toro_object, callback, deadline):
+        toro_object.wait(callback, deadline)

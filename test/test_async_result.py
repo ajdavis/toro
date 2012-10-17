@@ -4,6 +4,7 @@ Test toro.AsyncResult.
 
 from __future__ import with_statement
 
+from datetime import timedelta
 from functools import partial
 import time
 import unittest
@@ -32,12 +33,14 @@ class TestAsyncResult(unittest.TestCase):
     def test_get_nowait(self):
         # Without a callback, get() is non-blocking. 'timeout' is ignored.
         self.assertRaises(toro.NotReady, toro.AsyncResult().get)
-        self.assertRaises(toro.NotReady, toro.AsyncResult().get, timeout=1)
+        self.assertRaises(toro.NotReady,
+            toro.AsyncResult().get, deadline=timedelta(seconds=1))
 
     @async_test_engine()
     def test_returns_none_after_timeout(self, done):
         start = time.time()
-        value = yield gen.Task(toro.AsyncResult().get, timeout=.01)
+        value = yield gen.Task(
+            toro.AsyncResult().get, deadline=timedelta(seconds=.01))
         duration = time.time() - start
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertEqual(value, None)
@@ -91,7 +94,7 @@ class TestAsyncResult(unittest.TestCase):
     def test_get_timeout(self, done):
         result = toro.AsyncResult()
         start = time.time()
-        value = yield gen.Task(result.get, timeout=.01)
+        value = yield gen.Task(result.get, deadline=timedelta(seconds=.01))
         duration = time.time() - start
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertEqual(None, value)
@@ -101,7 +104,7 @@ class TestAsyncResult(unittest.TestCase):
         result.set('foo')
         self.assertTrue(result.ready())
         start = time.time()
-        value = yield gen.Task(result.get, timeout=.01)
+        value = yield gen.Task(result.get, deadline=timedelta(seconds=.01))
         duration = time.time() - start
         self.assertEqual('foo', value)
         self.assertAlmostEqual(0, duration, places=2)
@@ -115,6 +118,6 @@ class TestAsyncResultCommon(unittest.TestCase, BaseToroCommonTest):
     def notify(self, toro_object, value):
         toro_object.set(value)
 
-    def wait(self, toro_object, callback):
-        toro_object.get(callback)
+    def wait(self, toro_object, callback, deadline):
+        toro_object.get(callback, deadline)
 

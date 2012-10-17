@@ -4,6 +4,7 @@ Test toro.Event.
 Adapted from Gevent's lock_tests.py.
 """
 
+from datetime import timedelta
 import unittest
 import time
 
@@ -72,7 +73,7 @@ class TestEvent(unittest.TestCase):
         e = toro.Event()
 
         st = time.time()
-        result = yield gen.Task(e.wait, timeout=.01)
+        result = yield gen.Task(e.wait, deadline=timedelta(seconds=.01))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertEqual(None, result)
@@ -82,7 +83,7 @@ class TestEvent(unittest.TestCase):
             time.time() + .01, e.set)
 
         st = time.time()
-        result = yield gen.Task(e.wait, timeout=1)
+        result = yield gen.Task(e.wait, deadline=timedelta(seconds=1))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertEqual(None, result)
@@ -94,7 +95,7 @@ class TestEvent(unittest.TestCase):
         e.set()
         self.assertEqual(True, e.is_set())
         st = time.time()
-        result = yield gen.Task(e.wait, timeout=.01)
+        result = yield gen.Task(e.wait, deadline=timedelta(seconds=.01))
         duration = time.time() - st
         self.assertAlmostEqual(0, duration, places=2)
         self.assertEqual(None, result)
@@ -108,6 +109,6 @@ class TestEventCommon(unittest.TestCase, BaseToroCommonTest):
     def notify(self, toro_object, value):
         toro_object.set()
 
-    def wait(self, toro_object, callback):
-        toro_object.wait(callback)
+    def wait(self, toro_object, callback, deadline):
+        toro_object.wait(callback, deadline)
 

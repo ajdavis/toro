@@ -2,6 +2,7 @@
 Test toro.Condition.
 """
 
+from datetime import timedelta
 import time
 import unittest
 
@@ -80,7 +81,7 @@ class TestCondition(unittest.TestCase):
     def test_wait_timeout(self, done):
         c = toro.Condition()
         st = time.time()
-        yield gen.Task(c.wait, timeout=.1)
+        yield gen.Task(c.wait, deadline=timedelta(seconds=.1))
         duration = time.time() - st
         self.assertAlmostEqual(.1, duration, places=2)
         done()
@@ -93,7 +94,7 @@ class TestCondition(unittest.TestCase):
 
         # This fires before the wait times out
         loop.add_timeout(st + .1, c.notify)
-        yield gen.Task(c.wait, timeout=.2)
+        yield gen.Task(c.wait, deadline=timedelta(seconds=.2))
         duration = time.time() - st
 
         # Verify we were awakened by c.notify(), not by timeout
@@ -112,7 +113,7 @@ class TestCondition(unittest.TestCase):
         history = []
 
         c.wait(make_callback(0, history))
-        c.wait(make_callback(1, history), timeout=.1)
+        c.wait(make_callback(1, history), deadline=timedelta(seconds=.1))
         c.wait(make_callback(2, history))
         c.wait(make_callback(3, history))
 
@@ -134,7 +135,7 @@ class TestCondition(unittest.TestCase):
         history = []
 
         c.wait(make_callback(0, history))
-        c.wait(make_callback(1, history), timeout=.1)
+        c.wait(make_callback(1, history), deadline=timedelta(seconds=.1))
         c.wait(make_callback(2, history))
 
         # Wait for callback 1 to time out
@@ -153,6 +154,6 @@ class TestConditionCommon(unittest.TestCase, BaseToroCommonTest):
     def notify(self, toro_object, value):
         toro_object.notify()
 
-    def wait(self, toro_object, callback):
-        toro_object.wait(callback)
+    def wait(self, toro_object, callback, deadline):
+        toro_object.wait(callback, deadline)
 
