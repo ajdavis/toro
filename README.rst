@@ -2,7 +2,7 @@
 toro
 ====
 
-.. image:: doc/images/toro.png
+.. image:: https://raw.github.com/ajdavis/toro/master/doc/images/toro.png
 
 :Info: Synchronization primitives for Tornado coroutines.
 :Author: A. Jesse Jiryu Davis
