@@ -63,6 +63,11 @@ class ToroBase(object):
             _check_callback(callback)
             self.io_loop.add_callback(partial(callback, *args, **kwargs))
 
+    def _consume_expired_waiters(self, waiters):
+        # Delete waiters at the head of the queue who've timed out
+        while waiters and waiters[0].expired:
+            waiters.popleft()
+
     def _run_callback(self, callback, *args, **kwargs):
         try:
             callback(*args, **kwargs)
@@ -211,11 +216,6 @@ class Condition(ToroBase):
             result += ' waiters[%s]' % len(self.waiters)
         return result + '>'
 
-    def _consume_timed_out_waiters(self):
-        # Delete waiters at the head of the queue who've timed out
-        while self.waiters and self.waiters[0].expired:
-            self.waiters.popleft()
-
     def wait(self, callback=None, deadline=None):
         """Register a callback to be executed after :meth:`notify`.
 
@@ -237,14 +237,14 @@ class Condition(ToroBase):
         :Parameters:
           - `n`: The number of waiters to awaken (default: 1)
         """
-        self._consume_timed_out_waiters()
+        self._consume_expired_waiters(self.waiters)
 
         waiters = [] # Waiters we plan to run right now
         while n and self.waiters:
             waiter = self.waiters.popleft()
             n -= 1
             waiters.append(waiter)
-            self._consume_timed_out_waiters()
+            self._consume_expired_waiters(self.waiters)
 
         for waiter in waiters:
             waiter.run()
@@ -364,15 +364,6 @@ class Queue(ToroBase):
     def _put(self, item):
         self.queue.append(item)
 
-    # TODO: refactor w/ Condition
-    def _consume_expired_getters(self):
-        while self.getters and self.getters[0].expired:
-            self.getters.popleft()
-
-    def _consume_expired_putters(self):
-        while self.putters and self.putters[0][1].expired:
-            self.putters.popleft()
-
     def __repr__(self):
         return '<%s at %s %s>' % (type(self).__name__, hex(id(self)), self._format())
 
@@ -388,6 +379,11 @@ class Queue(ToroBase):
         if self.putters:
             result += ' putters[%s]' % len(self.putters)
         return result
+
+    def _consume_expired_putters(self):
+        # Delete waiters at the head of the queue who've timed out
+        while self.putters and self.putters[0][1].expired:
+            self.putters.popleft()
 
     def qsize(self):
         """Number of items in the queue"""
