@@ -475,7 +475,7 @@ class Queue(ToroBase):
 
         :Parameters:
           - `callback`: Optional callback taking one argument, run after a
-            waiter registered with :meth:`get`.
+            waiter registered with :meth:`put`.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
