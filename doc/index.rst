@@ -25,6 +25,8 @@ library.
 
 .. _gen: http://www.tornadoweb.org/documentation/gen.html
 
+.. _the-wait-notify-pattern:
+
 The Wait / Notify Pattern
 =========================
 
