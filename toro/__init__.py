@@ -130,7 +130,7 @@ class AsyncResult(ToroBase):
     To pass a value call :meth:`set`. Calls to :meth:`get` (those currently
     blocking as well as those made in the future) will return the value:
 
-        >>> result = AsyncResult()
+        >>> result = toro.AsyncResult()
         >>> result.set(100)
         >>> result.get()
         100

@@ -14,6 +14,10 @@
 # Custom: Sphinx doesn't produce a useful "module index" for Toro
 html_use_modindex = False
 
+doctest_global_setup = """
+import toro
+"""
+
 import sys, os
 
 # If extensions (or modules to document with autodoc) are in another directory,
