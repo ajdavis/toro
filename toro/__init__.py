@@ -218,7 +218,7 @@ class Condition(ToroBase):
             result += ' waiters[%s]' % len(self.waiters)
         return result + '>'
 
-    def wait(self, callback=None, deadline=None):
+    def wait(self, callback, deadline=None):
         """Register a callback to be executed after :meth:`notify`.
 
         .. note:: If you set a deadline, there is no way to determine whether
