@@ -5,7 +5,7 @@ recursively. It ignores pages that are not beneath `base_url` hierarchically.
 
 This function demos two Toro classes: :class:`~toro.JoinableQueue` and
 :class:`~toro.BoundedSemaphore`.
-The :class:`~toro.JoinableQueue` is a work queue; it begins with only
+The :class:`~toro.JoinableQueue` is a work queue; it begins containing only
 `base_url`, and each discovered URL is added to it. We wait for
 :meth:`~toro.JoinableQueue.join` to complete before exiting. This ensures that
 the function as a whole ends when all URLs have been downloaded.
