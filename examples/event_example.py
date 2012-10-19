@@ -51,5 +51,8 @@ class ProxyHandler(web.RequestHandler):
 
 if __name__ == '__main__':
     print 'Listening on port 8888'
+    print
+    print 'Now configure your web browser to use localhost:8888 as an HTTP Proxy.'
+    print 'Try visiting some web pages and hitting "refresh".'
     web.Application([('.*', ProxyHandler)], debug=True).listen(8888)
     ioloop.IOLoop.instance().start()
