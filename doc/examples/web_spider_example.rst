@@ -3,5 +3,5 @@
 
 .. automodule:: examples.joinable_queue_example
 
-.. literalinclude:: ../../examples/queue_example.py
+.. literalinclude:: ../../examples/web_spider_example.py
     :start-after: # start-file
