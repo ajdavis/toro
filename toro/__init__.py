@@ -455,8 +455,9 @@ class Queue(ToroBase):
             # we need to defer the put callback for one more iteration of the
             # loop to ensure that getters and putters alternate perfectly.
             # See TestChannel2.test_wait.
+            io_loop = self.io_loop
             def _callback(success):
-                self.io_loop.add_callback(partial(callback, success))
+                io_loop.add_callback(partial(callback, success))
 
             waiter = _Waiter(deadline, (Full,), self.io_loop, _callback)
             self.putters.append((item, waiter))
