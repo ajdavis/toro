@@ -73,7 +73,7 @@ timestamp (seconds since epoch)::
 ...or a ``datetime.timedelta`` for a deadline relative to the current time::
 
     # Wait up to 1 second
-    yield gen.Task(condition.wait, deadline=time.time() + datetime.timedelta(seconds=1))
+    yield gen.Task(condition.wait, deadline=datetime.timedelta(seconds=1))
 
 When a coroutine passes a deadline to a wait-method, there are different ways
 to determine whether it was awakened by a notify-method or if it timed out.
