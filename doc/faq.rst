@@ -55,10 +55,12 @@ normal callback functions, and in theory one could use Toro with callbacks
 instead of coroutines. However, Toro is intended for use in complex asynchronous
 programs. Simplifying such programs with coroutines is vehemently endorsed.
 
-.. _gen: http://www.tornadoweb.org/documentation/gen.html
+See :doc:`../examples/producer_consumer_example`
+and :doc:`../examples/producer_consumer_example_callbacks`
+to compare the relative difficulty of using a :class:`Queue` with and without
+coroutines.
 
-.. todo:: producer-consumer example w/ callbacks, compare by including
-  an equivalent coroutine example
+.. _gen: http://www.tornadoweb.org/documentation/gen.html
 
 Why no RLock?
 -------------
