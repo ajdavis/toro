@@ -263,6 +263,8 @@ class Event(ToroBase):
     :meth:`set` method and reset to false with the :meth:`clear` method. The :meth:`wait` method
     blocks until the flag is true.
 
+    .. seealso:: :doc:`examples/event_example`
+
     :Parameters:
       - `io_loop`: Optional custom IOLoop.
     """
@@ -332,6 +334,8 @@ class Queue(ToroBase):
       This is a bug.
 
     .. todo:: Fix it.
+
+    .. seealso:: :doc:`examples/queue_example`
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
@@ -543,6 +547,8 @@ class JoinableQueue(Queue):
     """A subclass of :class:`Queue` that additionally has :meth:`task_done` and
     :meth:`join` methods.
 
+    .. seealso:: :doc:`examples/queue_example`
+
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
       - `initial`: Optional sequence of initial items.
@@ -620,6 +626,8 @@ class Semaphore(object):
       thread.
 
     .. _threading.Semaphore: http://docs.python.org/library/threading.html#threading.Semaphore
+
+    .. seealso:: :doc:`examples/queue_example`
 
     :Parameters:
       - `value`: An int, the initial value (default 1).
@@ -712,7 +720,10 @@ class BoundedSemaphore(Semaphore):
     If it does, ``ValueError`` is raised. In most situations semaphores are used to guard resources
     with limited capacity. If the semaphore is released too many times it's a sign of a bug.
 
-    If not given, *value* defaults to 1."""
+    If not given, *value* defaults to 1.
+
+    .. seealso:: :doc:`examples/queue_example`
+    """
     def __init__(self, value=1, io_loop=None):
         super(BoundedSemaphore, self).__init__(value, io_loop)
         self._initial_value = value
