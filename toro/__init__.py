@@ -552,7 +552,7 @@ class JoinableQueue(Queue):
     """A subclass of :class:`Queue` that additionally has :meth:`task_done` and
     :meth:`join` methods.
 
-    .. seealso:: :doc:`examples/queue_example`
+    .. seealso:: :doc:`examples/web_spider_example`
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
@@ -632,7 +632,7 @@ class Semaphore(object):
 
     .. _threading.Semaphore: http://docs.python.org/library/threading.html#threading.Semaphore
 
-    .. seealso:: :doc:`examples/queue_example`
+    .. seealso:: :doc:`examples/web_spider_example`
 
     :Parameters:
       - `value`: An int, the initial value (default 1).
@@ -727,7 +727,7 @@ class BoundedSemaphore(Semaphore):
 
     If not given, *value* defaults to 1.
 
-    .. seealso:: :doc:`examples/queue_example`
+    .. seealso:: :doc:`examples/web_spider_example`
     """
     def __init__(self, value=1, io_loop=None):
         super(BoundedSemaphore, self).__init__(value, io_loop)
