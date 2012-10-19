@@ -1,6 +1,8 @@
 Frequently Asked Questions
 ==========================
 
+.. module:: toro
+
 What's it for?
 --------------
 Toro makes it easy for Tornado coroutines--that is, functions decorated with
@@ -58,8 +60,8 @@ programs. Simplifying such programs with coroutines is vehemently endorsed.
 .. todo:: producer-consumer example w/ callbacks, compare by including
   an equivalent coroutine example
 
-Why no RLock? Is Lock an RLock?
--------------------------------
+Why no RLock?
+-------------
 
 The standard-library RLock_ (reentrant lock) can be acquired multiple times by
 a single thread without blocking, reducing the chance of deadlock, especially
@@ -67,6 +69,6 @@ in recursive functions. The thread currently holding the RLock is the "owning
 thread."
 
 In Toro, simulating a concept like an "owning chain of callbacks" would be
-over-complicated and under-useful, so there is no RLock.
+over-complicated and under-useful, so there is no RLock, only a :class:`Lock`.
 
 .. _RLock: http://docs.python.org/library/threading.html#rlock-objects
