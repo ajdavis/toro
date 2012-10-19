@@ -6,6 +6,11 @@
 .. contents:: Contents
    :local:
 
+.. _primitives:
+
+Primitives
+~~~~~~~~~~
+
 AsyncResult
 -----------
 .. autoclass:: AsyncResult
@@ -36,6 +41,9 @@ Event
 .. autoclass:: Event
   :members:
 
+Queues
+~~~~~~
+
 Queue
 -----
 .. autoclass:: Queue
@@ -57,7 +65,7 @@ JoinableQueue
   :members:
 
 Class relationships
--------------------
+~~~~~~~~~~~~~~~~~~~
 
 Toro uses some of its primitives in the implementation of others.
 For example, :class:`JoinableQueue` is a subclass of :class:`Queue`, and it

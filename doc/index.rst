@@ -17,11 +17,16 @@ toro: Synchronization primitives for Tornado coroutines
 
 With Tornado's `gen`_ module, you can turn Python generators into full-featured
 coroutines, but coordination among these coroutines is difficult without
-mutexes, queues, and semaphores.
+mutexes, semaphores, and queues.
 
-Toro provides to Tornado coroutines a set of locking primitives analogous to
-those that Gevent provides to Greenlets, or that the standard library provides
-to threads.
+Toro provides to Tornado coroutines a set of locking primitives and queues
+analogous to those that Gevent provides to Greenlets, or that the standard
+library provides to threads.
+
+*(Note that these primitives and queues are not actually thread-safe and cannot
+be used in place of those from the standard library--they are meant to
+coordinate Tornado coroutines in single-threaded apps, not to protect shared
+objects in multithreaded apps.)*
 
 .. _gen: http://www.tornadoweb.org/documentation/gen.html
 
@@ -29,9 +34,9 @@ to threads.
 
 The Wait / Notify Pattern
 =========================
-
-Toro's primitives follow a "wait / notify pattern": one coroutine waits for
-notification from another. Let's take :class:`Condition` as an example:
+Toro's :ref:`primitives <primitives>` follow a "wait / notify pattern": one
+coroutine waits to be notified by another. Let's take :class:`Condition` as an
+example:
 
 .. doctest::
 
@@ -76,27 +81,63 @@ timestamp (seconds since epoch)::
     yield gen.Task(condition.wait, deadline=datetime.timedelta(seconds=1))
 
 When a coroutine passes a deadline to a wait-method, there are different ways
-to determine whether it was awakened by a notify-method or if it timed out.
+to determine whether it was awakened by a notify-method or if it timed out; see
+:ref:`the table below <wait-notify-table>`.
 
-=========================== ==================================  =================================   ===============================================
-Class                       Notify Method                       Wait Method                         After A Timeout....
-=========================== ==================================  =================================   ===============================================
-:class:`AsyncResult`        :meth:`AsyncResult.set`             :meth:`AsyncResult.get`             Callback receives ``None``
-:class:`Lock`               :meth:`Lock.release`                :meth:`Lock.acquire`                Callback receives ``False``
-:class:`Semaphore`          :meth:`Semaphore.release`           :meth:`Semaphore.acquire`           :meth:`Semaphore.locked` still ``True``
-:class:`Condition`          :meth:`Condition.notify`            :meth:`Condition.wait`              No way to know if it was a timeout
-:class:`Event`              :meth:`Event.set`                   :meth:`Event.wait`                  :meth:`Event.is_set` still ``False``
-:class:`JoinableQueue`      :meth:`JoinableQueue.task_done`     :meth:`JoinableQueue.join`          ``JoinableQueue.unfinished_tasks > 0``
-=========================== ==================================  =================================   ===============================================
+Some wait-methods can be called without a callback: in that case they may raise
+an exception (:meth:`AsyncResult.get` raises :exc:`NotReady`) if the
+notify-method hasn't run yet, or they return ``False``
+(:meth:`Lock.acquire` and :meth:`Semaphore.acquire`).
 
-For :class:`Queue` and its subclasses, :meth:`Queue.put` and :meth:`Queue.get`
-are each a wait-method **and** a notify-method: :meth:`Queue.put` blocks until
-the queue has a free slot, and :meth:`Queue.get` blocks until there is an
-available item.
+.. _wait-notify-table:
+
+======================= ==================================  ================================= ================================ ===============================================
+Class                   Notify Method                       Wait Method                       Without Callback                 After A Timeout....
+======================= ==================================  ================================= ================================ ===============================================
+:class:`AsyncResult`    :meth:`AsyncResult.set`             :meth:`AsyncResult.get`           value / raise :exc:`NotReady`    Callback receives ``None``
+:class:`Lock`           :meth:`Lock.release`                :meth:`Lock.acquire`              ``True`` / ``False``             Callback receives ``False``
+:class:`Semaphore`      :meth:`Semaphore.release`           :meth:`Semaphore.acquire`         ``True`` / ``False``             :meth:`Semaphore.locked` still ``True``
+:class:`Semaphore`                                          :meth:`Semaphore.wait`            callback required                :meth:`Semaphore.locked` still ``True``
+:class:`Condition`      :meth:`Condition.notify`            :meth:`Condition.wait`            callback required                No way to know if it was a timeout
+:class:`Event`          :meth:`Event.set`                   :meth:`Event.wait`                callback required                :meth:`Event.is_set` still ``False``
+======================= ==================================  ================================= ================================ ===============================================
+
+.. _the-get-put-pattern:
+
+The Get / Put Pattern
+=====================
+:class:`Queue` and its subclasses support methods :meth:`Queue.get` and
+:meth:`Queue.put`. These methods are each both a wait-method **and** a
+notify-method:
+
+* :meth:`Queue.get` waits until there is an available item in the queue, and
+  may notify a coroutine waiting to put an item.
+* :meth:`Queue.put` waits until the queue has a free slot, and may notify a
+  coroutine waiting to get an item.
+
+======================== ======================================== ======================================
+Method                   Without Callback                         After A Timeout.....
+======================== ======================================== ======================================
+:meth:`Queue.get`        returns item or raises :exc:`Empty`      callback receives :exc:`Empty`
+:meth:`Queue.put`        returns ``None`` or raises :exc:`Full`   callback receives :exc:`Full`
+======================== ======================================== ======================================
+
+See the :doc:`examples/producer_consumer_example`.
+
+Additionally, :class:`JoinableQueue` supports
+the wait-method :meth:`JoinableQueue.join`
+and the notify-method :meth:`JoinableQueue.task_done`:
+
+.. _join-task-done-table:
+
+======================== ==================================  ================================= ============================== ===============================================
+Class                    Notify Method                       Wait Method                       Without Callback               After A Timeout....
+======================== ==================================  ================================= ============================== ===============================================
+:class:`JoinableQueue`   :meth:`JoinableQueue.task_done`     :meth:`JoinableQueue.join`        callback required              ``JoinableQueue.unfinished_tasks > 0``
+======================== ==================================  ================================= ============================== ===============================================
 
 Contents
 ========
-
 .. toctree::
     examples/index
     classes
@@ -104,7 +145,6 @@ Contents
 
 Source
 ======
-
 Is on GitHub: https://github.com/ajdavis/toro
 
 Indices and tables
