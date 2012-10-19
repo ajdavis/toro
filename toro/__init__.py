@@ -67,10 +67,11 @@ class ToroBase(object):
             waiters.popleft()
 
     def _run_callback(self, callback, *args, **kwargs):
-        try:
-            callback(*args, **kwargs)
-        except Exception:
-            self.handle_callback_exception(callback)
+        if callback:
+            try:
+                callback(*args, **kwargs)
+            except Exception:
+                self.handle_callback_exception(callback)
 
     def handle_callback_exception(self, callback):
         """This method is called whenever a callback run Toro throws an
@@ -329,13 +330,17 @@ class Queue(ToroBase):
     be interrupted between calling :meth:`qsize` and doing an operation on the
     Queue.
 
+    **Examples:**
+
+    :doc:`examples/producer_consumer_example`
+
+    :doc:`examples/web_spider_example`
+
     .. warning:: Although :attr:`maxsize` is mutable, increasing it does not
       automatically unblock functions waiting to :meth:`put <Queue.put>` items.
       This is a bug.
 
     .. todo:: Fix it.
-
-    .. seealso:: :doc:`examples/queue_example`
 
     :Parameters:
       - `max_size`: Optional size limit (no limit by default).
@@ -442,7 +447,7 @@ class Queue(ToroBase):
             # Call _put and _get in case subclasses have special logic for them
             self._put(item)
             getter.run(self._get())
-            self._next_tick(callback, True)
+            self._run_callback(callback, True)
         elif self.maxsize == self.qsize() and callback:
             _check_callback(callback)
 
@@ -459,7 +464,7 @@ class Queue(ToroBase):
             raise Full
         else:
             self._put(item)
-            self._next_tick(callback, True)
+            self._run_callback(callback, True)
 
     def get(self, callback=None, deadline=None):
         """Remove and return an item from the queue.

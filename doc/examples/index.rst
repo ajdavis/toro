@@ -2,6 +2,7 @@ Examples
 ========
 
 .. toctree::
+    producer_consumer_example
     event_example
     web_spider_example
 
