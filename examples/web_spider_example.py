@@ -67,7 +67,7 @@ def spider(base_url, concurrency, callback):
 
     # Start worker, then wait for the work queue to be empty.
     worker()
-    yield gen.Task(q.join, timeout=300)
+    yield gen.Task(q.join, deadline=time.time() + 300)
 
     if q.unfinished_tasks:
         print 'Timed out!'
