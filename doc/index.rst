@@ -100,6 +100,11 @@ Contents
     classes
     faq
 
+Source
+======
+
+Is on GitHub: https://github.com/ajdavis/toro
+
 Indices and tables
 ==================
 
