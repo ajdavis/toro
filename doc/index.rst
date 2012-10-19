@@ -19,7 +19,7 @@ With Tornado's `gen`_ module, you can turn Python generators into full-featured
 coroutines, but coordination among these coroutines is difficult without
 mutexes, queues, and semaphores.
 
-Toro provides Tornado coroutines with a set of locking primitives analogous to
+Toro provides to Tornado coroutines a set of locking primitives analogous to
 those available for Greenlets in Gevent, or for threads in the standard
 library.
 
