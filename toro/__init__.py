@@ -458,7 +458,7 @@ class Queue(ToroBase):
             def _callback(success):
                 self.io_loop.add_callback(partial(callback, success))
 
-            waiter = _Waiter(deadline, (False,), self.io_loop, _callback)
+            waiter = _Waiter(deadline, (Full,), self.io_loop, _callback)
             self.putters.append((item, waiter))
         elif self.maxsize == self.qsize():
             raise Full

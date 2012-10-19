@@ -106,7 +106,7 @@ class QueueTest1(unittest.TestCase):
             pass
 
         # False is passed to the put() callback if it times out
-        self.assertFalse((yield Task(
+        self.assertEqual(Full, (yield Task(
             q.put, "full", deadline=timedelta(seconds=0.01))))
         self.assertEquals(q.qsize(), QUEUE_SIZE)
         # Test a blocking put
@@ -569,7 +569,7 @@ class TestQueueTimeouts3(unittest.TestCase):
         # Full Queue returns False if put() times out
         st = time.time()
         self.assertEqual(
-            False, (yield Task(q.put, 2, deadline=timedelta(seconds=.01))))
+            Full, (yield Task(q.put, 2, deadline=timedelta(seconds=.01))))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
 
@@ -582,7 +582,7 @@ class TestQueueTimeouts3(unittest.TestCase):
         # Full Queue *still* returns False if put() times out
         st = time.time()
         self.assertEqual(
-            False, (yield Task(q.put, 2, deadline=timedelta(seconds=.01))))
+            Full, (yield Task(q.put, 2, deadline=timedelta(seconds=.01))))
         duration = time.time() - st
         self.assertAlmostEqual(.01, duration, places=2)
         done()
