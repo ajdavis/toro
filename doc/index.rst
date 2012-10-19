@@ -20,8 +20,8 @@ coroutines, but coordination among these coroutines is difficult without
 mutexes, queues, and semaphores.
 
 Toro provides to Tornado coroutines a set of locking primitives analogous to
-those available for Greenlets in Gevent, or for threads in the standard
-library.
+those that Gevent provides to Greenlets, or that the standard library provides
+to threads.
 
 .. _gen: http://www.tornadoweb.org/documentation/gen.html
 
