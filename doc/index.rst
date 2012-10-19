@@ -1,7 +1,7 @@
 toro: Synchronization primitives for Tornado coroutines
 =======================================================
 
-.. image:: images/toro.png
+.. image:: _static/toro.png
     :align: center
 
 .. getting the caption italicized with a hyperlink in it requires some RST hackage
@@ -36,10 +36,17 @@ see what happened
 E.g. Condition.notify(callback), optionally resuming after waiters are
 awakened
 
-Contents
---------
+Contents:
+---------
+
 .. toctree::
     examples/index
     classes
     faq
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`search`
 
