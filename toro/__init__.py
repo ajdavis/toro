@@ -21,7 +21,7 @@ version = '.'.join(map(str, version_tuple))
 
 __all__ = [
     # Exceptions
-    'NotReady', 'AlreadySet',
+    'NotReady', 'AlreadySet', 'Full', 'Empty',
 
     # Classes
     'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
@@ -171,7 +171,7 @@ class AsyncResult(ToroBase):
 
     def get(self, callback=None, deadline=None):
         """Get a value now or after :meth:`set` is called. If called without a
-        callback, returns the value or raises :exc:`NotReady`. If called
+        callback, returns the value or raises :class:`NotReady`. If called
         with a callback, passes the value to the callback on the next iteration
         of the IOLoop, after :meth:`set` is called.
 
@@ -258,11 +258,13 @@ class Condition(ToroBase):
 
 class Event(ToroBase):
     """A synchronization primitive that allows one task to wake up one or more others.
-    It has a similar interface as :class:`threading.Event`.
+    It has a similar interface as threading.Event_.
 
     An Event object manages an internal flag that can be set to true with the
     :meth:`set` method and reset to false with the :meth:`clear` method. The :meth:`wait` method
     blocks until the flag is true.
+
+    .. _threading.Event: http://docs.python.org/library/threading.html#threading.Event
 
     .. seealso:: :doc:`examples/event_example`
 
@@ -336,9 +338,9 @@ class Queue(ToroBase):
 
     :doc:`examples/web_spider_example`
 
-    .. warning:: Although :attr:`maxsize` is mutable, increasing it does not
-      automatically unblock functions waiting to :meth:`put <Queue.put>` items.
-      This is a bug.
+    .. warning:: Although the ``maxsize`` attribute is mutable, increasing it
+      does not automatically unblock functions waiting to
+      :meth:`put <Queue.put>` items. This is a bug.
 
     .. todo:: Fix it.
 
@@ -429,8 +431,8 @@ class Queue(ToroBase):
         ``False`` if no free slot becomes available before the deadline.
 
         Without a callback, this method puts an item on the queue if a free slot
-        is immediately available, else raises :exc:`Full` exception. `deadline`
-        is ignored.
+        is immediately available, else raises the ``Queue.Full`` exception.
+        `deadline` is ignored.
 
         :Parameters:
           - `callback`: Optional callback taking one argument, run after a
@@ -474,10 +476,11 @@ class Queue(ToroBase):
         the callback is passed an item as soon as one is available.
 
         If `deadline` is a timestamp or timedelta, the callback is passed
-        :exc:`Queue.Empty` if no item becomes available before the deadline.
+        the exception ``Queue.Empty`` if no item becomes available before the
+        deadline.
 
         Without a callback, this method returns an item if one is immediately
-        available, else raises :exc:`Queue.Full`. `deadline` is ignored.
+        available, else raises exception ``Queue.Full``. `deadline` is ignored.
 
         :Parameters:
           - `callback`: Optional callback taking one argument, run after a
@@ -586,7 +589,7 @@ class JoinableQueue(Queue):
         (meaning that a :meth:`task_done` call was received for every item that had been
         :meth:`put <Queue.put>` into the queue).
 
-        Raises a :exc:`ValueError` if called more times than there were items placed in the queue.
+        Raises ``ValueError`` if called more times than there were items placed in the queue.
         """
         if self.unfinished_tasks <= 0:
             raise ValueError('task_done() called too many times')
@@ -797,7 +800,7 @@ class Lock(object):
         If any callbacks are waiting, the first one registered with
         :meth:`acquire` is passed ``True``.
 
-        If not locked, raise a :exc:`RuntimeError`.
+        If not locked, raise a RuntimeError.
         """
         if not self.locked():
             raise RuntimeError('release unlocked lock')

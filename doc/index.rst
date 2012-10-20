@@ -118,8 +118,8 @@ notify-method:
 ======================== ======================================== ======================================
 Method                   Without Callback                         After A Timeout.....
 ======================== ======================================== ======================================
-:meth:`Queue.get`        returns item or raises :exc:`Empty`      callback receives :exc:`Empty`
-:meth:`Queue.put`        returns ``None`` or raises :exc:`Full`   callback receives :exc:`Full`
+:meth:`Queue.get`        returns item or raises ``Empty``         callback receives ``Empty``
+:meth:`Queue.put`        returns ``None`` or raises ``Full``      callback receives ``Full``
 ======================== ======================================== ======================================
 
 See the :doc:`examples/producer_consumer_example`.

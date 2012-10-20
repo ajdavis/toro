@@ -1,6 +1,6 @@
 """A simple web-spider that crawls all the pages in http://tornadoweb.org.
 
-:meth:`spider` downloads the page at `base_url` and any pages it links to,
+``spider()`` downloads the page at `base_url` and any pages it links to,
 recursively. It ignores pages that are not beneath `base_url` hierarchically.
 
 This function demos two Toro classes: :class:`~toro.JoinableQueue` and

@@ -64,6 +64,21 @@ JoinableQueue
 .. autoclass:: JoinableQueue
   :members:
 
+Exceptions
+~~~~~~~~~~
+
+.. autoclass:: NotReady
+
+.. autoclass:: AlreadySet
+
+Toro also uses exceptions Empty_ and Full_ from the standard module Queue_.
+
+.. _Empty: http://docs.python.org/library/queue.html#Queue.Empty
+
+.. _Full: http://docs.python.org/library/queue.html#Queue.Full
+
+.. _Queue: http://docs.python.org/library/queue.html
+
 Class relationships
 ~~~~~~~~~~~~~~~~~~~
 
