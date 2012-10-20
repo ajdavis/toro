@@ -18,6 +18,8 @@ doctest_global_setup = """
 import toro
 """
 
+html_theme_options = {'collapsiblesidebar': True}
+
 import sys, os
 
 # If extensions (or modules to document with autodoc) are in another directory,
