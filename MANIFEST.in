@@ -1,0 +1,9 @@
+include README.rst
+include LICENSE
+recursive-include doc *.rst
+recursive-include doc *.py
+recursive-include doc *.png
+recursive-include doc Makefile
+prune doc/_build
+recursive-include examples *.py
+
