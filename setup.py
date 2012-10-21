@@ -7,5 +7,5 @@ setup(name='toro',
       author='A. Jesse Jiryu Davis',
       author_email='ajdavis@cs.oberlin.edu',
       url='https://github.com/ajdavis/toro/',
-      requires=['tornado>=2.3'],
+      requires=['tornado (>=2.3)'],
 )
