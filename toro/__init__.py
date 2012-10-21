@@ -260,9 +260,9 @@ class Event(ToroBase):
     """A synchronization primitive that allows one task to wake up one or more others.
     It has a similar interface as threading.Event_.
 
-    An Event object manages an internal flag that can be set to true with the
-    :meth:`set` method and reset to false with the :meth:`clear` method. The :meth:`wait` method
-    blocks until the flag is true.
+    An Event object manages an internal flag that can be set to true with
+    the :meth:`set` method and reset to false with the :meth:`clear` method.
+    The :meth:`wait` method blocks until the flag is true.
 
     .. _threading.Event: http://docs.python.org/library/threading.html#threading.Event
 
@@ -299,12 +299,12 @@ class Event(ToroBase):
     def wait(self, callback, deadline=None):
         """Block until the internal flag is true.
         If the flag is already true, the callback is run immediately.
-        Otherwise, block until the deadline, or until another task calls
-        :meth:`set` to set the flag to true.
+        Otherwise, block until the deadline, or until another task
+        calls :meth:`set` to set the flag to true.
 
         .. note:: If you set a deadline, you can determine whether
-           `callback` was run because of a :meth:`set` or a timeout by checking
-           :meth:`is_set`.
+           `callback` was run because of a :meth:`set` or a timeout by
+           checking :meth:`is_set`.
 
         :Parameters:
           - `callback`: Function taking no arguments.
@@ -339,8 +339,8 @@ class Queue(ToroBase):
     :doc:`examples/web_spider_example`
 
     .. warning:: Although the ``maxsize`` attribute is mutable, increasing it
-      does not automatically unblock functions waiting to
-      :meth:`put <Queue.put>` items. This is a bug.
+      does not automatically unblock functions waiting to :meth:`put <Queue.put>`
+      items. This is a bug.
 
     .. todo:: Fix it.
 
@@ -424,8 +424,8 @@ class Queue(ToroBase):
         the callback with the argument ``True``.
 
         If there's a waiting callback registered with :meth:`get`,
-        it receives the item and runs **before** the callback registered with
-        :meth:`put`.
+        it receives the item and runs **before** the callback registered
+        with :meth:`put`.
 
         If `deadline` is a timestamp or timedelta, the callback is passed
         ``False`` if no free slot becomes available before the deadline.
@@ -553,8 +553,8 @@ class LifoQueue(Queue):
 
 
 class JoinableQueue(Queue):
-    """A subclass of :class:`Queue` that additionally has :meth:`task_done` and
-    :meth:`join` methods.
+    """A subclass of :class:`Queue` that additionally has :meth:`task_done`
+    and :meth:`join` methods.
 
     .. seealso:: :doc:`examples/web_spider_example`
 
@@ -582,12 +582,12 @@ class JoinableQueue(Queue):
 
     def task_done(self):
         """Indicate that a formerly enqueued task is complete. Used by queue consumers.
-        For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call to
-        :meth:`task_done` tells the queue that the processing on the task is complete.
+        For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call
+        to :meth:`task_done` tells the queue that the processing on the task is complete.
 
         If a :meth:`join` is currently blocking, it will resume when all items have been processed
-        (meaning that a :meth:`task_done` call was received for every item that had been
-        :meth:`put <Queue.put>` into the queue).
+        (meaning that a :meth:`task_done` call was received for every item that had
+        been :meth:`put <Queue.put>` into the queue).
 
         Raises ``ValueError`` if called more times than there were items placed in the queue.
         """
@@ -629,8 +629,8 @@ class Semaphore(object):
     If not given, value defaults to 1.
 
     .. note:: Unlike the standard threading.Semaphore_, a :class:`Semaphore`
-      can tell you the current value of its :attr:`counter` or whether it is
-      :meth:`locked`, because code in a single-threaded Tornado app can check
+      can tell you the current value of its :attr:`counter` or whether it
+      is :meth:`locked`, because code in a single-threaded Tornado app can check
       these values and act upon them without fear of interruption from another
       thread.
 
@@ -667,8 +667,8 @@ class Semaphore(object):
         return self.q.empty()
 
     def release(self):
-        """Increment :attr:`counter` and wake one waiter blocking on
-        :meth:`acquire`.
+        """Increment :attr:`counter` and wake one waiter blocking
+        on :meth:`acquire`.
         """
         self.q.put(None)
         # TODO: what if locked() is still True here, because there was a
@@ -693,8 +693,8 @@ class Semaphore(object):
 
     def acquire(self, callback=None, deadline=None):
         """If a callback is passed, then decrement :attr:`counter` and run
-        the callback. If the counter is zero, wait for a
-        :meth:`release` or a timeout before running the callback.
+        the callback. If the counter is zero, wait for
+        a :meth:`release` or a timeout before running the callback.
 
         If no callback is passed, then if the counter is zero return ``False``,
         else if the counter is positive decrement it and return ``True``.
@@ -757,8 +757,8 @@ class Lock(object):
     the first one registered is called by :meth:`release`.
 
     .. note:: Unlike with the standard threading.Lock_, code in a
-      single-threaded Tornado application can check if a :class:`Lock` is
-      :meth:`locked`, and act on that information without fear that another
+      single-threaded Tornado application can check if a :class:`Lock`
+      is :meth:`locked`, and act on that information without fear that another
       thread has grabbed the lock, provided you do not yield to the IOLoop
       between checking :meth:`locked` and using a protected resource.
 
@@ -797,8 +797,8 @@ class Lock(object):
     def release(self):
         """Unlock.
 
-        If any callbacks are waiting, the first one registered with
-        :meth:`acquire` is passed ``True``.
+        If any callbacks are waiting, the first one registered
+        with :meth:`acquire` is passed ``True``.
 
         If not locked, raise a RuntimeError.
         """
