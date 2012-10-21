@@ -3,6 +3,7 @@
 # TODO: check on Gevent's licensing
 # TODO: review reprs and __str__'s
 # TODO: did I omit Gevent tests from the 2.7/ dir?
+# TODO: Py 3, test Jython & PyPy & add to classifiers
 from __future__ import with_statement
 
 import heapq
