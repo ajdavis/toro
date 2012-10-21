@@ -11,8 +11,8 @@ import logging
 import collections
 from functools import partial
 from Queue import Full, Empty
-from tornado import stack_context
 
+from tornado import stack_context
 from tornado.ioloop import IOLoop
 
 
