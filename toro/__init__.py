@@ -3,6 +3,8 @@
 # TODO: check on Gevent's licensing
 # TODO: review reprs and __str__'s
 # TODO: did I omit Gevent tests from the 2.7/ dir?
+from __future__ import with_statement
+
 import heapq
 import logging
 import collections
