@@ -16,10 +16,14 @@ Programming Language :: Python
 
 description = 'Synchronization primitives for Tornado coroutines.'
 
+long_description = open("README.rst").read()
+
+
 setup(name='toro',
-      version='0.1',
+      version='0.1.1',
       packages=['toro'],
       description=description,
+      long_description=long_description,
       author='A. Jesse Jiryu Davis',
       author_email='ajdavis@cs.oberlin.edu',
       url='http://github.com/ajdavis/toro/',

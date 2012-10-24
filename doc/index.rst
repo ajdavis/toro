@@ -142,6 +142,7 @@ Contents
     examples/index
     classes
     faq
+    changelog
 
 Source
 ======
