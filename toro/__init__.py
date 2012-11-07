@@ -35,10 +35,13 @@ __all__ = [
 
 
 class NotReady(Exception):
+    """Raised when accessing an :class:`AsyncResult` that has no value yet."""
     pass
 
 
 class AlreadySet(Exception):
+    """Raised when setting a value on an :class:`AsyncResult` that already
+    has one."""
     pass
 
 
