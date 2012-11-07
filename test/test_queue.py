@@ -98,22 +98,22 @@ class QueueTest1(unittest.TestCase):
             q.put(i)
             self.assert_(not q.empty(), "Queue should not be empty")
         self.assert_(not q.full(), "Queue should not be full")
-        q.put("last")
+        q.put(444)
         self.assert_(q.full(), "Queue should be full")
         try:
-            q.put("full")
+            q.put(555)
             self.fail("Didn't appear to block with a full queue")
         except Full:
             pass
 
         # False is passed to the put() callback if it times out
         self.assertEqual(Full, (yield Task(
-            q.put, "full", deadline=timedelta(seconds=0.01))))
+            q.put, 555, deadline=timedelta(seconds=0.01))))
         self.assertEquals(q.qsize(), QUEUE_SIZE)
         # Test a blocking put
-        yield Task(self.do_blocking_test, q.put, ("full",), {}, q.get, (), {})
+        yield Task(self.do_blocking_test, q.put, (555,), {}, q.get, (), {})
         yield Task(self.do_blocking_test, q.put,
-            ("full",), {'deadline': timedelta(seconds=10)}, q.get, (), {})
+            (555,), {'deadline': timedelta(seconds=10)}, q.get, (), {})
         # Empty it
         for i in range(QUEUE_SIZE):
             q.get()
@@ -127,9 +127,9 @@ class QueueTest1(unittest.TestCase):
         self.assertEqual(Empty, (yield Task(
             q.get, deadline=timedelta(seconds=0.01))))
         # Test a blocking get
-        yield Task(self.do_blocking_test, q.get, (), {}, q.put, ('empty',), {})
+        yield Task(self.do_blocking_test, q.get, (), {}, q.put, (555,), {})
         yield Task(self.do_blocking_test, q.get,
-            (), {'deadline': timedelta(seconds=10)}, q.put, ('empty',), {})
+            (), {'deadline': timedelta(seconds=10)}, q.put, (555,), {})
         callback()
 
     simple_queue_test.__test__ = False # Hide from nose

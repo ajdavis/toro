@@ -70,5 +70,6 @@ documentation. Documentation can be generated like::
 Testing
 =======
 
-``pip install nose`` and run ``nosetests`` in the root directory. Toro boasts
-100% code coverage, including branch-coverage!
+Tun ``python setup.py nosetests`` in the root directory.
+
+Toro boasts 100% code coverage, including branch-coverage!
