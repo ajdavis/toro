@@ -676,10 +676,9 @@ class Semaphore(object):
         on :meth:`acquire`.
         """
         self.q.put(None)
-        # TODO: what if locked() is still True here, because there was a
-        #   waiter for get() or because get() triggered a function that did
-        #   another acquire()? This needs a lot of testing.
-        self._unlocked.set()
+        if not self.locked():
+            # No one was waiting on acquire(), so self.q.qsize() is positive
+            self._unlocked.set()
 
     def wait(self, callback, deadline=None):
         """Wait for :attr:`locked` to be False

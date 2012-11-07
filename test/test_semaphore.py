@@ -239,24 +239,37 @@ class SemaphoreTests2(unittest.TestCase):
     @async_test_engine()
     def test_acquire_callback(self, done):
         # Test that callbacks passed to acquire() run immediately after
-        # release()
+        # release(), and that wait() callbacks aren't run until a release()
+        # with no waiters on acquire().
         sem = toro.Semaphore(0)
         history = []
         sem.acquire(make_callback('acquire1', history))
         sem.acquire(make_callback('acquire2', history))
-        sem.wait(make_callback('wait1', history))
-        sem.wait(make_callback('wait2', history))
+
+        def wait_callback(name):
+            def cb():
+                self.assertFalse(sem.locked())
+                history.append(name)
+            return cb
+
+        sem.wait(wait_callback('wait1'))
+        sem.wait(wait_callback('wait2'))
         sem.release()
         history.append('release1')
         sem.release()
         history.append('release2')
+        sem.release()
+        history.append('release3')
         self.assertEqual([
-                # First release wakes first acquire plus all waits
-                'acquire1', 'wait1', 'wait2', 'release1',
+            # First release wakes first acquire
+            'acquire1', 'release1',
 
-                # Second release wakes second acquire
-                'acquire2', 'release2'],
-            history)
+            # Second release wakes second acquire
+            'acquire2', 'release2',
+
+            # Third release wakes all waits
+            'wait1', 'wait2', 'release3'
+        ], history)
         done()
 
 
