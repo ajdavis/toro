@@ -634,10 +634,9 @@ class Semaphore(object):
     If not given, value defaults to 1.
 
     .. note:: Unlike the standard threading.Semaphore_, a :class:`Semaphore`
-      can tell you the current value of its :attr:`counter` or whether it
-      is :meth:`locked`, because code in a single-threaded Tornado app can check
-      these values and act upon them without fear of interruption from another
-      thread.
+      can tell you the current value of its :attr:`counter`, because code in a
+      single-threaded Tornado app can check these values and act upon them
+      without fear of interruption from another thread.
 
     .. _threading.Semaphore: http://docs.python.org/library/threading.html#threading.Semaphore
 
@@ -699,18 +698,14 @@ class Semaphore(object):
         """If a callback is passed, then decrement :attr:`counter` and run
         the callback. If the counter is zero, wait for
         a :meth:`release` or a timeout before running the callback.
+        If `deadline` is not ``None``, then the callback is passed ``False`` if
+        it times out before another coroutine calls :meth:`release`.
 
         If no callback is passed, then if the counter is zero return ``False``,
         else if the counter is positive decrement it and return ``True``.
 
-        .. note:: If you set a timeout, you can determine whether
-           `callback` was run because of a :meth:`release` or a timeout by
-           checking :meth:`locked`.
-
-        .. todo:: Correct?
-
         :Parameters:
-          - `callback`: Optional function taking no arguments.
+          - `callback`: Optional function taking one argument.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.

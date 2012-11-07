@@ -96,7 +96,7 @@ Class                   Notify Method                       Wait Method         
 ======================= ==================================  ================================= ================================ ===============================================
 :class:`AsyncResult`    :meth:`AsyncResult.set`             :meth:`AsyncResult.get`           value / raise :exc:`NotReady`    Callback receives ``None``
 :class:`Lock`           :meth:`Lock.release`                :meth:`Lock.acquire`              ``True`` / ``False``             Callback receives ``False``
-:class:`Semaphore`      :meth:`Semaphore.release`           :meth:`Semaphore.acquire`         ``True`` / ``False``             :meth:`Semaphore.locked` still ``True``
+:class:`Semaphore`      :meth:`Semaphore.release`           :meth:`Semaphore.acquire`         ``True`` / ``False``             Callback receives ``False``
 :class:`Semaphore`                                          :meth:`Semaphore.wait`            callback required                :meth:`Semaphore.locked` still ``True``
 :class:`Condition`      :meth:`Condition.notify`            :meth:`Condition.wait`            callback required                No way to know if it was a timeout
 :class:`Event`          :meth:`Event.set`                   :meth:`Event.wait`                callback required                :meth:`Event.is_set` still ``False``
