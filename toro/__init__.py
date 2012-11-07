@@ -765,6 +765,10 @@ class Lock(object):
       thread has grabbed the lock, provided you do not yield to the IOLoop
       between checking :meth:`locked` and using a protected resource.
 
+    .. note:: This class is not a context manager, and cannot be used in a
+      with-statement the way Python's standard Lock can, because with-statements
+      don't work with callbacks.
+
     .. _threading.Lock: http://docs.python.org/library/threading.html#threading.Lock
 
     :Parameters:
