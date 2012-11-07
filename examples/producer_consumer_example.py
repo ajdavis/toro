@@ -23,8 +23,9 @@ def producer():
     for item in range(10):
         yield gen.Task(q.put, item)
 
-producer()
-consumer()
-loop = ioloop.IOLoop.instance()
-q.join(callback=loop.stop) # block until all tasks are done
-loop.start()
+if __name__ == '__main__':
+    producer()
+    consumer()
+    loop = ioloop.IOLoop.instance()
+    q.join(callback=loop.stop) # block until all tasks are done
+    loop.start()

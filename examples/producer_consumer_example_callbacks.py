@@ -29,9 +29,10 @@ def producer(success=True):
         item_index += 1
         q.put(item, callback=producer)
 
-# Start producer and consumer
-producer()
-q.get(callback=consumer)
-loop = ioloop.IOLoop.instance()
-q.join(callback=loop.stop) # block until all tasks are done
-loop.start()
+if __name__ == '__main__':
+    # Start producer and consumer
+    producer()
+    q.get(callback=consumer)
+    loop = ioloop.IOLoop.instance()
+    q.join(callback=loop.stop) # block until all tasks are done
+    loop.start()
