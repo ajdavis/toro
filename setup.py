@@ -17,6 +17,8 @@ Programming Language :: Python :: 3.3
 Operating System :: MacOS :: MacOS X
 Operating System :: Unix
 Programming Language :: Python
+Programming Language :: Python :: Implementation :: CPython
+Programming Language :: Python :: Implementation :: PyPy
 """
 
 description = 'Synchronization primitives for Tornado coroutines.'
