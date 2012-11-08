@@ -106,7 +106,7 @@ class QueueTest1(unittest.TestCase):
         except Full:
             pass
 
-        # False is passed to the put() callback if it times out
+        # Full is passed to the put() callback if it times out
         self.assertEqual(Full, (yield Task(
             q.put, 555, deadline=timedelta(seconds=0.01))))
         self.assertEquals(q.qsize(), QUEUE_SIZE)
