@@ -236,6 +236,11 @@ class TestTimeoutAcquire(unittest.TestCase):
 
 # Not adapted from Gevent's tests, specific to Toro
 class SemaphoreTests2(unittest.TestCase):
+    def test_repr(self):
+        # No exceptions
+        str(toro.Semaphore())
+        repr(toro.Semaphore())
+
     @async_test_engine()
     def test_acquire_callback(self, done):
         # Test that callbacks passed to acquire() run immediately after
