@@ -34,24 +34,34 @@ class _TriggerTask(object):
         self.args = args
         self.kwargs = kwargs
         self.startedEvent = toro.Event()
+        self.completedEvent = toro.Event()
         IOLoop.instance().add_timeout(time.time() + 0.01, self.run)
 
     def run(self):
         self.startedEvent.set()
         self.fn(*self.args, **self.kwargs)
+        self.completedEvent.set()
 
 
 class QueueTest1(unittest.TestCase):
     type2test = toro.Queue
 
     @gen.engine
-    def do_blocking_test(self, block_func, block_args, block_kwargs, trigger_func, trigger_args, trigger_kwargs, callback):
+    def do_blocking_test(
+        self,
+        block_func, block_args, block_kwargs,
+        trigger_func, trigger_args, trigger_kwargs,
+        callback
+    ):
         self.t = _TriggerTask(trigger_func, trigger_args, trigger_kwargs)
         self.result = yield Task(block_func, *block_args, **block_kwargs)
-        # If block_func returned before our thread made the call, we failed!
+        # If block_func returned before our task made the call, we failed!
         if not self.t.startedEvent.is_set():
             self.fail("blocking function '%r' appeared not to block" %
                       block_func)
+
+        # make sure the task completes
+        yield Task(self.t.completedEvent.wait)
         callback(self.result)
 
     do_blocking_test.__test__ = False # Hide from nose
