@@ -2,8 +2,8 @@
 Test toro.Queue.
 
 There are three sections, one each for tests that are
-1. adapted from Gevent's test_queue.py, except for FailingQueueTest of which I
-   don't understand the purpose,
+1. adapted from Gevent's test_queue.py, except for FailingQueueTest which
+    isn't applicable
 2. adapted from Gevent's test__queue.py,
 3. written specifically for Toro.
 """
@@ -55,30 +55,6 @@ class QueueTest1(unittest.TestCase):
         callback(self.result)
 
     do_blocking_test.__test__ = False # Hide from nose
-
-    # Call this instead if block_func is supposed to raise an exception.
-    # TODO: useful?
-    def do_exceptional_blocking_test(self,block_func, block_args, trigger_func,
-                                   trigger_args, expected_exception_class):
-        self.t = _TriggerThread(trigger_func, trigger_args)
-        self.t.start()
-        try:
-            try:
-                block_func(*block_args)
-            except expected_exception_class:
-                raise
-            else:
-                self.fail("expected exception of kind %r" %
-                                 expected_exception_class)
-        finally:
-            self.t.join(10) # make sure the thread terminates
-            if self.t.isAlive():
-                self.fail("trigger function '%r' appeared to not return" %
-                                 trigger_func)
-            if not self.t.startedEvent.is_set():
-                self.fail("trigger thread ended but event never set")
-
-    do_exceptional_blocking_test.__test__ = False # Hide from nose
 
     @gen.engine
     def simple_queue_test(self, q, callback):
