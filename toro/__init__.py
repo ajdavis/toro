@@ -57,9 +57,8 @@ class ToroBase(object):
         self.io_loop = io_loop or IOLoop.instance()
 
     def _next_tick(self, callback, *args, **kwargs):
-        if callback:
-            _check_callback(callback)
-            self.io_loop.add_callback(partial(callback, *args, **kwargs))
+        _check_callback(callback)
+        self.io_loop.add_callback(partial(callback, *args, **kwargs))
 
     def _consume_expired_waiters(self, waiters):
         # Delete waiters at the head of the queue who've timed out
