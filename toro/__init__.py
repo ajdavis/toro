@@ -812,4 +812,3 @@ class Lock(object):
     def locked(self):
         """``True`` if the lock has been acquired"""
         return self._block.locked()
-
