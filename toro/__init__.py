@@ -657,9 +657,15 @@ class Semaphore(object):
         if value:
             self._unlocked.set()
 
+    def __repr__(self):
+        return '<%s at %s%s>' % (type(self).__name__, hex(id(self)), self._format())
+
     def __str__(self):
-        return '<%s counter=%s>' % (
-            self.__class__.__name__, self.counter)
+        return '<%s%s>' % (
+            self.__class__.__name__, self._format())
+
+    def _format(self):
+        return ' counter=%s' % self.counter
 
     @property
     def counter(self):
