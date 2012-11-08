@@ -446,7 +446,6 @@ class Queue(ToroBase):
             assert not self.queue, "queue non-empty, why are getters waiting?"
             getter = self.getters.popleft()
 
-            # Call _put and _get in case subclasses have special logic for them
             self._put(item)
             getter.run(self._get())
             self._run_callback(callback, True)
