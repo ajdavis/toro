@@ -5,7 +5,7 @@ toro
 .. image:: https://raw.github.com/ajdavis/toro/master/doc/_static/toro.png
 
 :Info: Synchronization primitives for Tornado coroutines.
-:Author: A. Jesse Jiryu Davis
+:Author: A\. Jesse Jiryu Davis
 
 Documentation: http://toro.readthedocs.org/
 
