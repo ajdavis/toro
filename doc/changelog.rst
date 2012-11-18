@@ -2,7 +2,7 @@ Changelog
 =========
 
 Changes in Version 0.2
-------------------------
+----------------------
 
 Python 3 support.
 
