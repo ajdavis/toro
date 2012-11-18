@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Changes in Next Release
+-----------------------
+
+Travis integration.
+
 Changes in Version 0.2
 ----------------------
 
