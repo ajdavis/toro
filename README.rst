@@ -9,6 +9,9 @@ toro
 
 Documentation: http://toro.readthedocs.org/
 
+.. image:: https://travis-ci.org/ajdavis/toro.png
+        :target: https://travis-ci.org/ajdavis/toro
+
 About
 =====
 A set of locking and synchronizing primitives analogous to those in Python's
