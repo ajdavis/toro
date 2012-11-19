@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Changes in Next Release
------------------------
+Changes in Version 0.3
+----------------------
 
 Increasing the :attr:`~toro.Queue.maxsize` of a :class:`~toro.Queue` unblocks
 callbacks waiting on :meth:`~toro.Queue.put`.
