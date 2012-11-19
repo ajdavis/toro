@@ -450,16 +450,7 @@ class Queue(ToroBase):
             self._run_callback(callback, True)
         elif self.maxsize == self.qsize() and callback:
             _check_callback(callback)
-
-            # When a getter runs and frees up a slot so this putter can run,
-            # we need to defer the put callback for one more iteration of the
-            # loop to ensure that getters and putters alternate perfectly.
-            # See TestChannel2.test_wait.
-            io_loop = self.io_loop
-            def _callback(success):
-                io_loop.add_callback(partial(callback, success))
-
-            waiter = _Waiter(deadline, (Full,), self.io_loop, _callback)
+            waiter = _Waiter(deadline, (Full,), self.io_loop, callback)
             self.putters.append((item, waiter))
         elif self.maxsize == self.qsize():
             raise Full
@@ -494,7 +485,11 @@ class Queue(ToroBase):
             self._put(item)
             if callback:
                 self._run_callback(callback, self._get())
-                putter.run(True)
+                # When a getter runs and frees up a slot so this putter can
+                # run, we need to defer the put callback for an iteration
+                # of the loop to ensure that getters and putters alternate
+                # perfectly. See TestChannel2.test_wait.
+                self.io_loop.add_callback(partial(putter.run, True))
             else:
                 self.io_loop.add_callback(partial(putter.run, True))
                 return self._get()
