@@ -344,7 +344,7 @@ class Queue(ToroBase):
     .. todo:: Fix it.
 
     :Parameters:
-      - `max_size`: Optional size limit (no limit by default).
+      - `maxsize`: Optional size limit (no limit by default).
       - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
 
@@ -512,7 +512,7 @@ class PriorityQueue(Queue):
     Entries are typically tuples of the form: ``(priority number, data)``.
 
     :Parameters:
-      - `max_size`: Optional size limit (no limit by default).
+      - `maxsize`: Optional size limit (no limit by default).
       - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
@@ -531,7 +531,7 @@ class LifoQueue(Queue):
     first.
 
     :Parameters:
-      - `max_size`: Optional size limit (no limit by default).
+      - `maxsize`: Optional size limit (no limit by default).
       - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
@@ -552,7 +552,7 @@ class JoinableQueue(Queue):
     .. seealso:: :doc:`examples/web_spider_example`
 
     :Parameters:
-      - `max_size`: Optional size limit (no limit by default).
+      - `maxsize`: Optional size limit (no limit by default).
       - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
