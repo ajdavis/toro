@@ -337,12 +337,6 @@ class Queue(ToroBase):
 
     :doc:`examples/web_spider_example`
 
-    .. warning:: Although the ``maxsize`` attribute is mutable, increasing it
-      does not automatically unblock functions waiting to :meth:`put <Queue.put>`
-      items. This is a bug.
-
-    .. todo:: Fix it.
-
     :Parameters:
       - `maxsize`: Optional size limit (no limit by default).
       - `initial`: Optional sequence of initial items.
@@ -356,7 +350,7 @@ class Queue(ToroBase):
         super(Queue, self).__init__(io_loop)
         if maxsize is not None and maxsize < 0:
             raise ValueError("maxsize can't be negative")
-        self.maxsize = maxsize
+        self._maxsize = maxsize
 
         # _Waiters
         self.getters = collections.deque([])
@@ -397,6 +391,42 @@ class Queue(ToroBase):
     def qsize(self):
         """Number of items in the queue"""
         return len(self.queue)
+
+    def get_maxsize(self):
+        """Number of items allowed in the queue.
+
+        Setting maxsize to a larger number unblocks callbacks waiting
+        on :meth:`put`. Decreasing maxsize below :meth:`qsize`
+        raises :exc:`RuntimeError`:
+
+        >>> from tornado import gen
+        >>> q = toro.Queue(0)
+        >>> @gen.engine
+        ... def f():
+        ...     print 'Trying to put...'
+        ...     yield gen.Task(q.put, 'a')
+        ...     print 'Done putting'
+        ...
+        >>> f()
+        Trying to put...
+        >>> q.maxsize = 1
+        Done putting
+        """
+        return self._maxsize
+
+    def set_maxsize(self, maxsize):
+        if maxsize < self.qsize():
+            raise RuntimeError("%s has %d items, can't set maxsize to %d" % (
+                repr(self), self.qsize(), maxsize))
+
+        self._maxsize = maxsize
+        while self.qsize() < maxsize and self.putters:
+            item, putter = self.putters.popleft()
+            if not putter.expired:
+                self._put(item)
+                putter.run(True)
+
+    maxsize = property(get_maxsize, set_maxsize)
 
     def empty(self):
         """Return ``True`` if the queue is empty, ``False`` otherwise."""

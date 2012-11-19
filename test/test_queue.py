@@ -494,6 +494,70 @@ class TestQueue3(unittest.TestCase):
     def test_maxsize(self):
         self.assertRaises(ValueError, toro.Queue, -1)
 
+    @async_test_engine()
+    def test_increase_maxsize(self, done):
+        q = toro.Queue(1)
+        loop = IOLoop.instance()
+
+        history = []
+
+        @gen.engine
+        def putter(callback):
+            self.assertTrue((yield Task(q.put, 0))) # doesn't block
+            history.append('put 0')
+            self.assertTrue((yield Task(q.put, 1))) # blocks
+            history.append('put 1')
+            # doesn't block, runs after size is 3
+            self.assertTrue((yield Task(q.put, 2)))
+            history.append('put 2')
+            self.assertEqual(
+                Full,
+                (yield Task(q.put, 3, deadline=timedelta(seconds=.01))))
+
+            history.append('failed to put 3')
+            self.assertTrue((yield Task(q.put, 4))) # blocks
+            history.append('put 4')
+            callback()
+
+        # start coroutine, now it's blocked at 'put 1'
+        putter((yield gen.Callback('putter')))
+
+        history.append('setting maxsize 3')
+        # unblock it, it'll block at 'put 3'
+        q.maxsize = 3
+        # let 'put 3' task time out
+        yield Task(loop.add_timeout, timedelta(seconds=0.02))
+        history.append('set maxsize 3')
+
+        self.assertEqual(3, q.qsize()) # 3 wasn't put, timed out
+
+        history.append('setting maxsize 4')
+        # unblock it
+        q.maxsize = 4
+        history.append('set maxsize 4')
+
+        self.assertEqual([
+            'put 0',
+            'setting maxsize 3', 'put 1', 'put 2',
+            'failed to put 3', 'set maxsize 3',
+            'setting maxsize 4', 'put 4', 'set maxsize 4',
+        ], history)
+
+        yield gen.Wait('putter')
+        done()
+
+    def test_decrease_maxsize(self):
+        q = toro.Queue(1)
+        q.put(0)
+
+        def decrease():
+            q.maxsize -= 1
+
+        self.assertRaises(RuntimeError, decrease)
+        q.maxsize = 2
+        q.put(1)
+        self.assertRaises(RuntimeError, decrease)
+
     def test_full(self):
         self.assertTrue(toro.Queue(0).full())
         self.assertFalse(toro.Queue().full())

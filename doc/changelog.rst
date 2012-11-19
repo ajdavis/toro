@@ -4,6 +4,9 @@ Changelog
 Changes in Next Release
 -----------------------
 
+Increasing the :attr:`~toro.Queue.maxsize` of a :class:`~toro.Queue` unblocks
+callbacks waiting on :meth:`~toro.Queue.put`.
+
 Travis integration.
 
 Changes in Version 0.2
