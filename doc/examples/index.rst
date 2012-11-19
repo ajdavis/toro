@@ -7,5 +7,3 @@ Examples
     lock_example
     event_example
     web_spider_example
-
-.. todo: Lock example
