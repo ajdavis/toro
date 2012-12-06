@@ -148,6 +148,10 @@ Source
 ======
 Is on GitHub: https://github.com/ajdavis/toro
 
+Bug Reports and Feature Requests
+================================
+Also on GitHub: https://github.com/ajdavis/toro/issues
+
 Indices and tables
 ==================
 
