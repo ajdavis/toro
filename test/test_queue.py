@@ -804,6 +804,20 @@ class TestJoinableQueue3(unittest.TestCase):
         self.assertEqual(1, q.unfinished_tasks)
         done()
 
+    def test_io_loop(self):
+        global_loop = IOLoop.instance()
+        custom_loop = IOLoop()
+        self.assertNotEqual(global_loop, custom_loop)
+        q = toro.JoinableQueue(None, io_loop=custom_loop)
+
+        def callback(v):
+            assert v == 'foo'
+            custom_loop.stop()
+
+        q.get(callback)
+        q.put('foo')
+        custom_loop.start()
+
 
 class TestQueueCommon(unittest.TestCase, BaseToroCommonTest):
     def toro_object(self, io_loop=None):

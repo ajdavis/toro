@@ -587,7 +587,7 @@ class JoinableQueue(Queue):
       - `io_loop`: Optional custom IOLoop.
     """
     def __init__(self, maxsize=None, io_loop=None):
-        Queue.__init__(self, maxsize, io_loop)
+        Queue.__init__(self, maxsize=maxsize, io_loop=io_loop)
         self.unfinished_tasks = 0
         self._finished = Event(io_loop)
         self._finished.set()
