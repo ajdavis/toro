@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Changes in Next Release
+Changes in Version 0.4
 ----------------------
 
 Bugfix in :class:`~toro.JoinableQueue`, `JoinableQueue doesn't accept an
