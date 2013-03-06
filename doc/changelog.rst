@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Changes in Next Release
+----------------------
+
+Bugfix in :class:`~toro.JoinableQueue`, `JoinableQueue doesn't accept an
+explicit IOLoop <https://github.com/ajdavis/toro/issues/1>`_.
+
 Changes in Version 0.3
 ----------------------
 
