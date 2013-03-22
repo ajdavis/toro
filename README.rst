@@ -31,7 +31,9 @@ Tornado_ >= version 2.3.
 
 Examples
 ========
-Here's a basic example (for more see the *examples* section of the docs)::
+Here's a basic example (for more see the *examples* section of the docs):
+
+.. code-block:: python
 
     from tornado import ioloop, gen
     import toro
@@ -62,7 +64,9 @@ Documentation
 =============
 
 You will need Sphinx_ and GraphViz_ installed to generate the
-documentation. Documentation can be generated like::
+documentation. Documentation can be generated like:
+
+.. code-block:: console
 
     $ sphinx-build doc build
 
