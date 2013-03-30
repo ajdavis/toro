@@ -73,7 +73,7 @@ class ToroBase(object):
                 self.handle_callback_exception(callback)
 
     def handle_callback_exception(self, callback):
-        """This method is called whenever a callback run Toro throws an
+        """This method is called whenever a callback run by Toro throws an
         exception.
 
         By default simply logs the exception as an error.  Subclasses
@@ -93,8 +93,8 @@ class _Waiter(ToroBase):
         """
         Create a deferred callback. If deadline is not None, it may be a number
         denoting a unix timestamp (as returned by ``time.time()``) or a
-        ``datetime.timedelta`` object for a deadline relative to the current time.
-        callback(*timeout_args) is executed after a timeout.
+        ``datetime.timedelta`` object for a deadline relative to the current
+        time. callback(*timeout_args) is executed after a timeout.
 
         Waiters are only ever executed once.
         """
