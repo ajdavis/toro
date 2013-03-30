@@ -240,7 +240,7 @@ class Condition(ToroBase):
         """
         self._consume_expired_waiters(self.waiters)
 
-        waiters = [] # Waiters we plan to run right now
+        waiters = []  # Waiters we plan to run right now
         while n and self.waiters:
             waiter = self.waiters.popleft()
             n -= 1

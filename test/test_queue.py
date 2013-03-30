@@ -64,12 +64,12 @@ class QueueTest1(unittest.TestCase):
         yield Task(self.t.completedEvent.wait)
         callback(self.result)
 
-    do_blocking_test.__test__ = False # Hide from nose
+    do_blocking_test.__test__ = False  # Hide from nose
 
     @gen.engine
     def simple_queue_test(self, q, callback):
         if not q.empty():
-            raise RuntimeError, "Call this function with an empty queue"
+            raise RuntimeError("Call this function with an empty queue")
         # I guess we better check things actually queue correctly a little :)
         q.put(111)
         q.put(333)
@@ -128,6 +128,7 @@ class QueueTest1(unittest.TestCase):
         yield Task(self.simple_queue_test, q)
         yield Task(self.simple_queue_test, q)
         done()
+
 
 class LifoQueueTest1(QueueTest1):
     type2test = toro.LifoQueue
