@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Changes in Next Version
+-----------------------
+
+Dropped support for Python 2.5.
+
 Changes in Version 0.4
 ----------------------
 

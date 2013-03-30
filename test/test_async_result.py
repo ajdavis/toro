@@ -2,8 +2,6 @@
 Test toro.AsyncResult.
 """
 
-from __future__ import with_statement
-
 from datetime import timedelta
 from functools import partial
 import time

@@ -7,7 +7,6 @@ There are three sections, one each for tests that are
 2. adapted from Gevent's test__queue.py,
 3. written specifically for Toro.
 """
-from __future__ import with_statement
 
 from datetime import timedelta
 import time
