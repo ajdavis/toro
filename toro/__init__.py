@@ -5,6 +5,7 @@ from functools import partial
 from Queue import Full, Empty
 
 from tornado import stack_context
+from tornado.concurrent import Future
 from tornado.ioloop import IOLoop
 
 
@@ -43,17 +44,30 @@ def _check_callback(callback):
     Toro runs this on any callback before registering on IOLoop for future
     execution, to reduce confusion about the source of a TypeError. Note that
     calling a callback directly, or putting it in a _Waiter, don't require
-    check_callback().
+    _check_callback().
     """
     if not callable(callback):
         raise TypeError(
-            "callback must be callable, not %s" % repr(callback))
+            "callback must be callable, not %r" % callback)
+
+
+def _check_future(future):
+    """
+    Toro runs this on any Future before registering on IOLoop to reduce
+    confusion about the source of a TypeError. Note that calling a method
+    on a Future directly, or putting it in a _FutureWaiter, don't require
+    _check_future().
+    """
+    if not isinstance(future, Future):
+        raise TypeError(
+            "future must be instance of Future, not %r" % future)
 
 
 class ToroBase(object):
     def __init__(self, io_loop):
         self.io_loop = io_loop or IOLoop.instance()
 
+    # TODO: needed?
     def _next_tick(self, callback, *args, **kwargs):
         _check_callback(callback)
         self.io_loop.add_callback(partial(callback, *args, **kwargs))
@@ -85,6 +99,7 @@ class ToroBase(object):
         logging.error("Exception in callback %r", callback, exc_info=True)
 
 
+# TODO: rename, refactor
 class _Waiter(ToroBase):
     """Internal Toro utility class"""
     def __init__(self, deadline, timeout_args, io_loop, callback):
@@ -94,7 +109,7 @@ class _Waiter(ToroBase):
         ``datetime.timedelta`` object for a deadline relative to the current
         time. callback(*timeout_args) is executed after a timeout.
 
-        Waiters are only ever executed once.
+        _Waiters are only ever executed once.
         """
         super(_Waiter, self).__init__(io_loop)
         _check_callback(callback)
@@ -105,17 +120,52 @@ class _Waiter(ToroBase):
         # after deferral.
         self.callback = stack_context.wrap(callback)
 
-    def run(self, *args, **kwargs):
+    def run(self, result):
         if self.callback:
             callback, self.callback = self.callback, None
             # Clear the current stack context and run in the context that was
             # captured when we initialized.
             with stack_context.NullContext():
-                self._run_callback(callback, *args, **kwargs)
+                self._run_callback(callback, result)
 
     @property
     def expired(self):
         return not self.callback
+
+
+# TODO: rename, refactor
+class _FutureWaiter(ToroBase):
+    """Internal Toro utility class"""
+    def __init__(self, deadline, timeout_exception, io_loop, future):
+        """
+        Create a Future with a deadline. If deadline is not None,
+        it may be a number denoting a unix timestamp (as returned by
+        ``time.time()``) or a ``datetime.timedelta`` object for a deadline
+        relative to the current time. future.set_exception(timeout_exception)
+        is executed after a timeout.
+
+        _FutureWaiters are only ever executed once.
+        """
+        super(_FutureWaiter, self).__init__(io_loop)
+        _check_future(future)
+        if deadline is not None:
+            self.io_loop.add_timeout(
+                deadline, partial(future.set_exception, timeout_exception))
+
+        # TODO: stack context?
+        self.future = future
+
+    def run(self, result=None):
+        if not self.future.done():
+            # Clear the current stack context and run in the context that was
+            # captured when we initialized.
+            # TODO: needed?
+            with stack_context.NullContext():
+                self.future.set_result(result)
+
+    @property
+    def expired(self):
+        return self.future.done()
 
 
 class AsyncResult(ToroBase):
@@ -150,6 +200,7 @@ class AsyncResult(ToroBase):
             result += 'unset'
             if self.waiters:
                 result += ' waiters[%s]' % len(self.waiters)
+
         return result + '>'
 
     def set(self, value):
@@ -167,10 +218,13 @@ class AsyncResult(ToroBase):
         return self._ready
 
     def get(self, callback=None, deadline=None):
-        """Get a value now or after :meth:`set` is called. If called without a
-        callback, returns the value or raises :class:`NotReady`. If called
-        with a callback, passes the value to the callback on the next iteration
-        of the IOLoop, after :meth:`set` is called.
+        """Get a value once :meth:`set` is called.
+
+        If called with a callback, passes the value to the callback after
+        :meth:`set` is called. The callback receives ``None`` after a timeout.
+
+        Returns a Future whose result will be the value. The Future raises
+        :class:`NotReady` after a timeout.
 
         :Parameters:
           - `callback`: Optional callback taking one argument, this
@@ -179,19 +233,28 @@ class AsyncResult(ToroBase):
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
+        future = Future()
         if self.ready():
-            if not callback:
-                # Non-blocking get
-                return self.value
-
-            self._next_tick(callback, self.value)
+            future.set_result(self.value)
+            if callback:
+                callback(self.value)
         else:
-            if not callback:
-                raise NotReady
-
-            # After timeout, callback will be passed None
             self.waiters.append(
-                _Waiter(deadline, (None,), self.io_loop, callback))
+                _FutureWaiter(deadline, NotReady, self.io_loop, future))
+
+            if callback:
+                # After timeout, callback will be passed None
+                self.waiters.append(
+                    _Waiter(deadline, (None,), self.io_loop, callback))
+
+        return future
+
+    def get_nowait(self):
+        """Get the value if ready, or raise :class:`NotReady`."""
+        if self.ready():
+            return self.value
+        else:
+            raise NotReady
 
 
 class Condition(ToroBase):

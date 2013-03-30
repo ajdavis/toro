@@ -5,18 +5,15 @@ Test toro.AsyncResult.
 from datetime import timedelta
 from functools import partial
 import time
-import unittest
 
-from tornado import gen
-from tornado.ioloop import IOLoop
+from tornado.testing import gen_test, AsyncTestCase
+
 
 import toro
-
 from test import make_callback, BaseToroCommonTest
-from test.async_test_engine import async_test_engine
 
 
-class TestAsyncResult(unittest.TestCase):
+class TestAsyncResult(AsyncTestCase):
     def test_str(self):
         result = toro.AsyncResult()
         str(result)
@@ -29,93 +26,85 @@ class TestAsyncResult(unittest.TestCase):
         self.assertTrue('waiters' in str(result))
 
     def test_get_nowait(self):
-        # Without a callback, get() is non-blocking. 'timeout' is ignored.
-        self.assertRaises(toro.NotReady, toro.AsyncResult().get)
-        self.assertRaises(toro.NotReady,
-            toro.AsyncResult().get, deadline=timedelta(seconds=1))
+        self.assertRaises(toro.NotReady, toro.AsyncResult().get_nowait)
 
-    @async_test_engine()
-    def test_returns_none_after_timeout(self, done):
+    @gen_test
+    def test_raises_after_timeout(self):
         start = time.time()
-        value = yield gen.Task(
-            toro.AsyncResult().get, deadline=timedelta(seconds=.01))
+        with self.assertRaises(toro.NotReady):
+            async_result = toro.AsyncResult(self.io_loop)
+            yield async_result.get(deadline=timedelta(seconds=.01))
         duration = time.time() - start
         self.assertAlmostEqual(.01, duration, places=2)
-        self.assertEqual(value, None)
-        done()
 
-    @async_test_engine()
-    def test_set(self, done):
-        result = toro.AsyncResult()
+    @gen_test
+    def test_set(self):
+        result = toro.AsyncResult(io_loop=self.io_loop)
         self.assertFalse(result.ready())
-        IOLoop.instance().add_timeout(
+        self.io_loop.add_timeout(
             time.time() + .01, partial(result.set, 'hello'))
         start = time.time()
-        value = yield gen.Task(result.get)
+        value = yield result.get()
         duration = time.time() - start
         self.assertAlmostEqual(.01, duration, places=2)
         self.assertTrue(result.ready())
         self.assertEqual('hello', value)
 
         # Second and third get()'s work too
-        self.assertEqual('hello', (yield gen.Task(result.get)))
-        self.assertEqual('hello', (yield gen.Task(result.get)))
+        self.assertEqual('hello', (yield result.get()))
+        self.assertEqual('hello', (yield result.get()))
 
         # Non-blocking get() works
-        self.assertEqual('hello', result.get())
+        self.assertEqual('hello', result.get_nowait())
 
         # Timeout ignored now
         start = time.time()
-        value = yield gen.Task(result.get)
+        value = yield result.get()
         duration = time.time() - start
         self.assertAlmostEqual(0, duration, places=2)
         self.assertEqual('hello', value)
 
         # set() only allowed once
         self.assertRaises(toro.AlreadySet, result.set, 'whatever')
-        done()
 
-    @async_test_engine()
-    def test_get_callback(self, done):
+    @gen_test
+    def test_get_callback(self):
         # Test that callbacks registered with get() run immediately after set()
-        result = toro.AsyncResult()
+        result = toro.AsyncResult(io_loop=self.io_loop)
         history = []
         result.get(make_callback('get1', history))
         result.get(make_callback('get2', history))
         result.set('foo')
         history.append('set')
-        yield gen.Task(IOLoop.instance().add_callback)
         self.assertEqual(['get1', 'get2', 'set'], history)
-        done()
 
-    @async_test_engine()
-    def test_get_timeout(self, done):
-        result = toro.AsyncResult()
+    @gen_test
+    def test_get_timeout(self):
+        result = toro.AsyncResult(io_loop=self.io_loop)
         start = time.time()
-        value = yield gen.Task(result.get, deadline=timedelta(seconds=.01))
+        with self.assertRaises(toro.NotReady):
+            yield result.get(deadline=timedelta(seconds=.01))
+
         duration = time.time() - start
         self.assertAlmostEqual(.01, duration, places=2)
-        self.assertEqual(None, value)
         self.assertFalse(result.ready())
 
         # Timed-out waiter doesn't cause error
         result.set('foo')
         self.assertTrue(result.ready())
         start = time.time()
-        value = yield gen.Task(result.get, deadline=timedelta(seconds=.01))
+        value = yield result.get(deadline=timedelta(seconds=.01))
         duration = time.time() - start
         self.assertEqual('foo', value)
         self.assertAlmostEqual(0, duration, places=2)
-        done()
 
 
-class TestAsyncResultCommon(unittest.TestCase, BaseToroCommonTest):
-    def toro_object(self, io_loop=None):
-        return toro.AsyncResult(io_loop)
+class TestAsyncResultCommon(AsyncTestCase, BaseToroCommonTest):
+    def toro_object(self):
+        return toro.AsyncResult(self.io_loop)
 
-    def notify(self, toro_object, value):
+    def toro_notify(self, toro_object, value):
         toro_object.set(value)
 
-    def wait(self, toro_object, callback, deadline):
-        toro_object.get(callback, deadline)
-
+    def toro_wait(self, toro_object, callback=None, deadline=None):
+        return toro_object.get(callback=callback, deadline=deadline)
