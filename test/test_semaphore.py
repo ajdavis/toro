@@ -5,21 +5,18 @@ Adapted from Gevent's lock_tests.py and test__semaphore.py.
 """
 
 from datetime import timedelta
-import unittest
 import time
 import sys
 
 from tornado import gen
-from tornado.ioloop import IOLoop
+from tornado.testing import gen_test, AsyncTestCase
 
 import toro
-
-from test import make_callback, BaseToroCommonTest
-from test.async_test_engine import async_test_engine
+from test import make_callback
 
 
 # Adapted from Gevent's lock_tests.py
-class BaseSemaphoreTests(unittest.TestCase):
+class BaseSemaphoreTests(AsyncTestCase):
     semtype = None
 
     def test_constructor(self):
@@ -31,34 +28,29 @@ class BaseSemaphoreTests(unittest.TestCase):
         self.assertTrue(self.semtype.__name__ in str(q))
         self.assertTrue('counter=5' in str(q))
 
-    @async_test_engine()
-    def test_acquire(self, done):
+    @gen_test
+    def test_acquire(self):
         sem = self.semtype(1)
         self.assertFalse(sem.locked())
         result = sem.acquire()
         self.assertTrue(result)
         self.assertTrue(sem.locked())
         # Wait for release()
-        sem.wait(callback=(yield gen.Callback('unlocked0')))
+        future = sem.wait()
         sem.release()
-        yield gen.Wait('unlocked0')
+        yield future
 
         # Now wait() is instant
-        sem.wait(callback=(yield gen.Callback('unlocked1')))
-        yield gen.Wait('unlocked1')
+        yield sem.wait()
 
         sem = self.semtype(2)
         sem.acquire()
         sem.acquire()
         sem.release()
         sem.release()
-        done()
 
-    # Gevent's test_acquire_destroy isn't relevant to Toro
-    #def test_acquire_destroy(self):
-
-    @async_test_engine()
-    def test_acquire_contended(self, done):
+    @gen_test
+    def test_acquire_contended(self):
         sem = self.semtype(7)
         sem.acquire()
         N = 10
@@ -66,11 +58,11 @@ class BaseSemaphoreTests(unittest.TestCase):
         results2 = []
         phase_num = 0
 
-        @gen.engine
+        @gen.coroutine
         def f():
-            yield gen.Task(sem.acquire)
+            yield sem.acquire()
             results1.append(phase_num)
-            yield gen.Task(sem.acquire)
+            yield sem.acquire()
             results2.append(phase_num)
 
         # Start independent tasks
@@ -79,7 +71,7 @@ class BaseSemaphoreTests(unittest.TestCase):
 
         # Let them all run until the counter reaches 0
         while len(results1) + len(results2) < 6:
-            yield gen.Task(IOLoop.instance().add_callback)
+            yield gen.Task(self.io_loop.add_callback)
 
         self.assertEqual(results1 + results2, [0] * 6)
         phase_num = 1
@@ -88,7 +80,7 @@ class BaseSemaphoreTests(unittest.TestCase):
             sem.release()
 
         while len(results1) + len(results2) < 13:
-            yield gen.Task(IOLoop.instance().add_callback)
+            yield gen.Task(self.io_loop.add_callback)
 
         self.assertEqual(sorted(results1 + results2), [0] * 6 + [1] * 7)
         phase_num = 2
@@ -97,80 +89,53 @@ class BaseSemaphoreTests(unittest.TestCase):
             sem.release()
 
         while len(results1) + len(results2) < 19:
-            yield gen.Task(IOLoop.instance().add_callback)
+            yield gen.Task(self.io_loop.add_callback)
 
         self.assertEqual(sorted(results1 + results2), [0] * 6 + [1] * 7 + [2] * 6)
 
         # The semaphore is still locked
-        self.assertFalse(sem.acquire())
+        self.assertTrue(sem.locked())
+        with self.assertRaises(toro.Timeout):
+            yield sem.acquire(deadline=timedelta(seconds=0.1))
+
         # Final release, to let the last task finish
         sem.release()
-        done()
 
     def test_try_acquire(self):
         sem = self.semtype(2)
-        self.assertTrue(sem.acquire())
-        self.assertTrue(sem.acquire())
-        self.assertFalse(sem.acquire())
+        yield sem.acquire()
+        yield sem.acquire()
+        with self.assertRaises(toro.Timeout):
+            yield sem.acquire(deadline=timedelta(seconds=0.1))
+
         sem.release()
-        self.assertTrue(sem.acquire())
+        yield sem.acquire()
 
-    @async_test_engine()
-    def test_try_acquire_contended(self, done):
-        sem = self.semtype(4)
-        sem.acquire()
-        results = []
-
-        @gen.engine
-        def f(callback):
-            results.append(sem.acquire())
-            # Allow switching
-            yield gen.Task(IOLoop.instance().add_callback)
-            results.append(sem.acquire())
-            callback()
-
-        # Start subtasks
-        for i in range(5):
-            f(callback=(yield gen.Callback(i)))
-
-        # Join them
-        yield gen.WaitAll(range(5))
-
-        # There can be a thread switch between acquiring the semaphore and
-        # appending the result, therefore results will not necessarily be
-        # ordered.
-        self.assertEqual(sorted(results), [False] * 7 + [True] *  3)
-        done()
-
-    @async_test_engine()
-    def test_default_value(self, done):
+    @gen_test
+    def test_default_value(self):
         # The default initial value is 1.
         sem = self.semtype()
         sem.acquire()
 
         f_finished = [False]
 
-        @gen.engine
-        def f(callback):
-            yield gen.Task(sem.acquire)
+        @gen.coroutine
+        def f():
+            yield sem.acquire()
 
             # Allow switching
-            yield gen.Task(IOLoop.instance().add_callback)
+            yield gen.Task(self.io_loop.add_callback)
             sem.release()
             f_finished[0] = True
-            callback()
 
-        f(callback=(yield gen.Callback('f')))
+        future = f()
 
         # Let f run
-        yield gen.Task(IOLoop.instance().add_timeout, time.time() + .01)
+        yield gen.Task(self.io_loop.add_timeout, time.time() + .01)
         self.assertFalse(f_finished[0])
         sem.release()
-        yield gen.Wait('f')
-        done()
+        yield future
 
-    # Gevent's test_with isn't relevant to Toro
-    #def test_with(self):
 
 # Not a test - called from SemaphoreTests and BoundedSemaphoreTests
 BaseSemaphoreTests.__test__ = False
@@ -211,54 +176,50 @@ BoundedSemaphoreTests.__test__ = True
 
 
 # Adapted from Gevent's test__semaphore.py
-class TestTimeoutAcquire(unittest.TestCase):
-    @async_test_engine()
-    def test_acquire_returns_false_after_timeout(self, done):
+class TestTimeoutAcquire(AsyncTestCase):
+    @gen_test
+    def test_acquire_returns_false_after_timeout(self):
         s = toro.Semaphore(value=0)
-        result = yield gen.Task(s.acquire, deadline=timedelta(seconds=0.01))
+        with self.assertRaises(toro.Timeout):
+            yield s.acquire(deadline=timedelta(seconds=0.01))
 
-        # result can't be None, only precisely False
-        self.assertTrue(result is False)
-        done()
-
-    @async_test_engine()
-    def test_release_twice(self, done):
+    @gen_test
+    def test_release_twice(self):
         s = toro.Semaphore()
         result = []
-        s.acquire(lambda x: result.append('a'))
+        s.acquire().add_done_callback(lambda x: result.append('a'))
         s.release()
-        s.acquire(lambda x: result.append('b'))
+        s.acquire().add_done_callback(lambda x: result.append('b'))
         s.release()
-        yield gen.Task(IOLoop.instance().add_timeout, time.time() + .01)
+        yield gen.Task(self.io_loop.add_timeout, time.time() + .01)
         self.assertEqual(result, ['a', 'b'])
-        done()
 
 
 # Not adapted from Gevent's tests, specific to Toro
-class SemaphoreTests2(unittest.TestCase):
+class SemaphoreTests2(AsyncTestCase):
     def test_repr(self):
         # No exceptions
         str(toro.Semaphore())
         repr(toro.Semaphore())
 
-    @async_test_engine()
-    def test_acquire_callback(self, done):
+    @gen_test
+    def test_acquire_callback(self):
         # Test that callbacks passed to acquire() run immediately after
         # release(), and that wait() callbacks aren't run until a release()
         # with no waiters on acquire().
         sem = toro.Semaphore(0)
         history = []
-        sem.acquire(make_callback('acquire1', history))
-        sem.acquire(make_callback('acquire2', history))
+        sem.acquire().add_done_callback(make_callback('acquire1', history))
+        sem.acquire().add_done_callback(make_callback('acquire2', history))
 
         def wait_callback(name):
-            def cb():
+            def cb(_):
                 self.assertFalse(sem.locked())
                 history.append(name)
             return cb
 
-        sem.wait(wait_callback('wait1'))
-        sem.wait(wait_callback('wait2'))
+        sem.wait().add_done_callback(wait_callback('wait1'))
+        sem.wait().add_done_callback(wait_callback('wait2'))
         sem.release()
         history.append('release1')
         sem.release()
@@ -275,15 +236,3 @@ class SemaphoreTests2(unittest.TestCase):
             # Third release wakes all waits
             'wait1', 'wait2', 'release3'
         ], history)
-        done()
-
-
-class TestSemaphoreCommon(unittest.TestCase, BaseToroCommonTest):
-    def toro_object(self, io_loop=None):
-        return toro.Semaphore(io_loop=io_loop)
-
-    def notify(self, toro_object, value):
-        toro_object.release()
-
-    def wait(self, toro_object, callback, deadline):
-        toro_object.wait(callback, deadline)

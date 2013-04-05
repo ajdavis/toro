@@ -4,52 +4,45 @@ Test toro.Condition.
 
 from datetime import timedelta
 import time
-import unittest
 
 from tornado import gen
-from tornado.ioloop import IOLoop
+from tornado.testing import gen_test, AsyncTestCase
+
 
 import toro
-
-from test import make_callback, BaseToroCommonTest
-from test.async_test_engine import async_test_engine
+from test import make_callback
 
 
-class TestCondition(unittest.TestCase):
+class TestCondition(AsyncTestCase):
     def test_str(self):
         c = toro.Condition()
         self.assertTrue('Condition' in str(c))
         self.assertFalse('waiters' in str(c))
-        c.wait(lambda: None)
+        c.wait()
         self.assertTrue('waiters' in str(c))
 
-    @async_test_engine()
-    def test_notify(self, done):
-        loop = IOLoop.instance()
-        c = toro.Condition()
-        loop.add_timeout(time.time() + .1, c.notify)
-        yield gen.Task(c.wait)
-        done()
+    @gen_test
+    def test_notify(self):
+        c = toro.Condition(self.io_loop)
+        self.io_loop.add_timeout(time.time() + .1, c.notify)
+        yield c.wait()
 
-    @async_test_engine()
-    def test_notify_1(self, done):
+    def test_notify_1(self):
         c = toro.Condition()
         history = []
-        c.wait(make_callback('wait1', history))
-        c.wait(make_callback('wait2', history))
+        c.wait().add_done_callback(make_callback('wait1', history))
+        c.wait().add_done_callback(make_callback('wait2', history))
         c.notify(1)
         history.append('notify1')
         c.notify(1)
         history.append('notify2')
         self.assertEqual(['wait1', 'notify1', 'wait2', 'notify2'], history)
-        done()
 
-    @async_test_engine()
-    def test_notify_n(self, done):
+    def test_notify_n(self):
         c = toro.Condition()
         history = []
         for i in range(6):
-            c.wait(make_callback(i, history))
+            c.wait().add_done_callback(make_callback(i, history))
 
         c.notify(3)
 
@@ -59,14 +52,12 @@ class TestCondition(unittest.TestCase):
         self.assertEqual(list(range(4)), history)
         c.notify(2)
         self.assertEqual(list(range(6)), history)
-        done()
 
-    @async_test_engine()
-    def test_notify_all(self, done):
+    def test_notify_all(self):
         c = toro.Condition()
         history = []
         for i in range(4):
-            c.wait(make_callback(i, history))
+            c.wait().add_done_callback(make_callback(i, history))
 
         c.notify_all()
         history.append('notify_all')
@@ -75,85 +66,71 @@ class TestCondition(unittest.TestCase):
         self.assertEqual(
             list(range(4)) + ['notify_all'],
             history)
-        done()
 
-    @async_test_engine()
-    def test_wait_timeout(self, done):
-        c = toro.Condition()
+    @gen_test
+    def test_wait_timeout(self):
+        c = toro.Condition(self.io_loop)
         st = time.time()
-        yield gen.Task(c.wait, deadline=timedelta(seconds=.1))
+        with self.assertRaises(toro.Timeout):
+            yield c.wait(deadline=timedelta(seconds=.1))
+
         duration = time.time() - st
         self.assertAlmostEqual(.1, duration, places=2)
-        done()
 
-    @async_test_engine()
-    def test_wait_timeout_preempted(self, done):
-        loop = IOLoop.instance()
-        c = toro.Condition()
+    @gen_test
+    def test_wait_timeout_preempted(self):
+        c = toro.Condition(self.io_loop)
         st = time.time()
 
         # This fires before the wait times out
-        loop.add_timeout(st + .1, c.notify)
-        yield gen.Task(c.wait, deadline=timedelta(seconds=.2))
+        self.io_loop.add_timeout(st + .1, c.notify)
+        yield c.wait(deadline=timedelta(seconds=.2))
         duration = time.time() - st
 
         # Verify we were awakened by c.notify(), not by timeout
         self.assertAlmostEqual(.1, duration, places=2)
-        done()
 
-    @async_test_engine()
-    def test_notify_n_with_timeout(self, done):
+    @gen_test
+    def test_notify_n_with_timeout(self):
         # Register callbacks 0, 1, 2, and 3. Callback 1 has a timeout.
         # Wait for that timeout to expire, then do notify(2) and make
         # sure everyone runs. Verifies that a timed-out callback does
         # not count against the 'n' argument to notify().
-        loop = IOLoop.instance()
-        c = toro.Condition()
+        c = toro.Condition(self.io_loop)
         st = time.time()
         history = []
 
-        c.wait(make_callback(0, history))
-        c.wait(make_callback(1, history), deadline=timedelta(seconds=.1))
-        c.wait(make_callback(2, history))
-        c.wait(make_callback(3, history))
+        c.wait().add_done_callback(make_callback(0, history))
+        c.wait(deadline=timedelta(seconds=.1)).add_done_callback(
+            make_callback(1, history))
+
+        c.wait().add_done_callback(make_callback(2, history))
+        c.wait().add_done_callback(make_callback(3, history))
 
         # Wait for callback 1 to time out
-        yield gen.Task(loop.add_timeout, st + .2)
+        yield gen.Task(self.io_loop.add_timeout, st + .2)
         self.assertEqual([1], history)
 
         c.notify(2)
         self.assertEqual([1, 0, 2], history)
         c.notify()
         self.assertEqual([1, 0, 2, 3], history)
-        done()
 
-    @async_test_engine()
-    def test_notify_all_with_timeout(self, done):
-        loop = IOLoop.instance()
-        c = toro.Condition()
+    @gen_test
+    def test_notify_all_with_timeout(self):
+        c = toro.Condition(self.io_loop)
         st = time.time()
         history = []
 
-        c.wait(make_callback(0, history))
-        c.wait(make_callback(1, history), deadline=timedelta(seconds=.1))
-        c.wait(make_callback(2, history))
+        c.wait().add_done_callback(make_callback(0, history))
+        c.wait(deadline=timedelta(seconds=.1)).add_done_callback(
+            make_callback(1, history))
+
+        c.wait().add_done_callback(make_callback(2, history))
 
         # Wait for callback 1 to time out
-        yield gen.Task(loop.add_timeout, st + .2)
+        yield gen.Task(self.io_loop.add_timeout, st + .2)
         self.assertEqual([1], history)
 
         c.notify_all()
         self.assertEqual([1, 0, 2], history)
-        done()
-
-
-class TestConditionCommon(unittest.TestCase, BaseToroCommonTest):
-    def toro_object(self, io_loop=None):
-        return toro.Condition(io_loop)
-
-    def notify(self, toro_object, value):
-        toro_object.notify()
-
-    def wait(self, toro_object, callback, deadline):
-        toro_object.wait(callback, deadline)
-

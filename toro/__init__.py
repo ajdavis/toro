@@ -1,12 +1,10 @@
 import heapq
-import logging
 import collections
 from functools import partial
 from Queue import Full, Empty
 
-from tornado import stack_context
+from tornado import ioloop, gen
 from tornado.concurrent import Future
-from tornado.ioloop import IOLoop
 
 
 version_tuple = (0, 4, '+')
@@ -17,7 +15,7 @@ version = '.'.join(map(str, version_tuple))
 
 __all__ = [
     # Exceptions
-    'NotReady', 'AlreadySet', 'Full', 'Empty',
+    'NotReady', 'AlreadySet', 'Full', 'Empty', 'Timeout',
 
     # Classes
     'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
@@ -39,162 +37,80 @@ class AlreadySet(Exception):
     pass
 
 
-def _check_callback(callback):
-    """
-    Toro runs this on any callback before registering on IOLoop for future
-    execution, to reduce confusion about the source of a TypeError. Note that
-    calling a callback directly, or putting it in a _Waiter, don't require
-    _check_callback().
-    """
-    if not callable(callback):
-        raise TypeError(
-            "callback must be callable, not %r" % callback)
+class Timeout(Exception):
+    pass
 
 
-def _check_future(future):
-    """
-    Toro runs this on any Future before registering on IOLoop to reduce
-    confusion about the source of a TypeError. Note that calling a method
-    on a Future directly, or putting it in a _FutureWaiter, don't require
-    _check_future().
-    """
-    if not isinstance(future, Future):
-        raise TypeError(
-            "future must be instance of Future, not %r" % future)
+class _TimeoutFuture(Future):
 
+    def __init__(self, deadline, io_loop):
+        """Create a Future with optional deadline.
 
-class ToroBase(object):
-    def __init__(self, io_loop):
-        self.io_loop = io_loop or IOLoop.instance()
+        If deadline is not None, it may be a number denoting a unix timestamp
+        (as returned by ``time.time()``) or a ``datetime.timedelta`` object
+        for a deadline relative to the current time.
 
-    # TODO: needed?
-    def _next_tick(self, callback, *args, **kwargs):
-        _check_callback(callback)
-        self.io_loop.add_callback(partial(callback, *args, **kwargs))
-
-    def _consume_expired_waiters(self, waiters):
-        # Delete waiters at the head of the queue who've timed out
-        while waiters and waiters[0].expired:
-            waiters.popleft()
-
-    def _run_callback(self, callback, *args, **kwargs):
-        if callback:
-            try:
-                callback(*args, **kwargs)
-            except Exception:
-                self.handle_callback_exception(callback)
-
-    def handle_callback_exception(self, callback):
-        """This method is called whenever a callback run by Toro throws an
-        exception.
-
-        By default simply logs the exception as an error.  Subclasses
-        may override this method to customize reporting of exceptions.
-
-        The exception itself is not passed explicitly, but is available
-        in sys.exc_info.
-
-        Copied from IOLoop's implementation.
+        set_exception(toro.Timeout) is executed after a timeout.
         """
-        logging.error("Exception in callback %r", callback, exc_info=True)
 
-
-# TODO: rename, refactor
-class _Waiter(ToroBase):
-    """Internal Toro utility class"""
-    def __init__(self, deadline, timeout_args, io_loop, callback):
-        """
-        Create a deferred callback. If deadline is not None, it may be a number
-        denoting a unix timestamp (as returned by ``time.time()``) or a
-        ``datetime.timedelta`` object for a deadline relative to the current
-        time. callback(*timeout_args) is executed after a timeout.
-
-        _Waiters are only ever executed once.
-        """
-        super(_Waiter, self).__init__(io_loop)
-        _check_callback(callback)
+        super(_TimeoutFuture, self).__init__()
+        self.io_loop = io_loop
         if deadline is not None:
-            self.io_loop.add_timeout(deadline, partial(self.run, *timeout_args))
+            callback = partial(self.set_exception, Timeout)
+            self._timeout_handle = io_loop.add_timeout(deadline, callback)
+        else:
+            self._timeout_handle = None
 
-        # Capture the current stack context so it's restored when we're run
-        # after deferral.
-        self.callback = stack_context.wrap(callback)
+    def set_result(self, result):
+        self._cancel_timeout()
+        super(_TimeoutFuture, self).set_result(result)
 
-    def run(self, result):
-        if self.callback:
-            callback, self.callback = self.callback, None
-            # Clear the current stack context and run in the context that was
-            # captured when we initialized.
-            with stack_context.NullContext():
-                self._run_callback(callback, result)
+    def set_exception(self, exception):
+        self._cancel_timeout()
+        super(_TimeoutFuture, self).set_exception(exception)
 
-    @property
-    def expired(self):
-        return not self.callback
+    def link(self, future):
+        future.add_done_callback(self._done_callback)
 
+    def _done_callback(self, _):
+        if not self.done():
+            self.set_result(None)
 
-# TODO: rename, refactor
-class _FutureWaiter(ToroBase):
-    """Internal Toro utility class"""
-    def __init__(self, deadline, timeout_exception, io_loop, future):
-        """
-        Create a Future with a deadline. If deadline is not None,
-        it may be a number denoting a unix timestamp (as returned by
-        ``time.time()``) or a ``datetime.timedelta`` object for a deadline
-        relative to the current time. future.set_exception(timeout_exception)
-        is executed after a timeout.
-
-        _FutureWaiters are only ever executed once.
-        """
-        super(_FutureWaiter, self).__init__(io_loop)
-        _check_future(future)
-        if deadline is not None:
-            self.io_loop.add_timeout(
-                deadline, partial(future.set_exception, timeout_exception))
-
-        # TODO: stack context?
-        self.future = future
-
-    def run(self, result=None):
-        if not self.future.done():
-            # Clear the current stack context and run in the context that was
-            # captured when we initialized.
-            # TODO: needed?
-            with stack_context.NullContext():
-                self.future.set_result(result)
-
-    @property
-    def expired(self):
-        return self.future.done()
+    def _cancel_timeout(self):
+        if self._timeout_handle:
+            self.io_loop.remove_timeout(self._timeout_handle)
+            self._timeout_handle = None
 
 
-class AsyncResult(ToroBase):
+def _consume_expired_waiters(waiters):
+    # Delete waiters at the head of the queue who've timed out
+    while waiters and waiters[0].done():
+        waiters.popleft()
+
+
+_null_result = object()
+
+
+class AsyncResult(object):
     """A one-time event that stores a value or an exception.
 
-    Like :class:`Event` it wakes up all the waiters when :meth:`set`
-    is called. Waiters receive the passed value by calling :meth:`get`.
+    The only distinction between AsyncResult and a simple Future is that
+    AsyncResult offers waiting with a timeout that each waiter can configure.
+
     An :class:`AsyncResult` instance cannot be reset.
-
-    To pass a value call :meth:`set`. Calls to :meth:`get` (those currently
-    blocking as well as those made in the future) will return the value:
-
-        >>> result = toro.AsyncResult()
-        >>> result.set(100)
-        >>> result.get()
-        100
 
     :Parameters:
       - `io_loop`: Optional custom IOLoop.
     """
+
     def __init__(self, io_loop=None):
-        super(AsyncResult, self).__init__(io_loop)
-        self._ready = False
-        self.value = None
+        self.io_loop = io_loop or ioloop.IOLoop.current()
+        self.value = _null_result
         self.waiters = []
 
     def __str__(self):
         result = '<%s ' % (self.__class__.__name__, )
-        if self._ready:
+        if self.ready():
             result += 'value=%r' % self.value
         else:
             result += 'unset'
@@ -205,47 +121,34 @@ class AsyncResult(ToroBase):
 
     def set(self, value):
         """Set a value and wake up all the waiters."""
-        if self._ready:
+        if self.ready():
             raise AlreadySet
 
         self.value = value
-        self._ready = True
         waiters, self.waiters = self.waiters, []
         for waiter in waiters:
-            waiter.run(value)
+            if not waiter.done():  # Might have timed out
+                waiter.set_result(value)
 
     def ready(self):
-        return self._ready
+        return self.value is not _null_result
 
-    def get(self, callback=None, deadline=None):
-        """Get a value once :meth:`set` is called.
+    def get(self, deadline=None):
+        """Get a value once :meth:`set` is called. Returns a Future.
 
-        If called with a callback, passes the value to the callback after
-        :meth:`set` is called. The callback receives ``None`` after a timeout.
-
-        Returns a Future whose result will be the value. The Future raises
-        :class:`NotReady` after a timeout.
+        The Future's result will be the value. The Future raises
+        :exc:`toro.Timeout` if no value is set before the deadline.
 
         :Parameters:
-          - `callback`: Optional callback taking one argument, this
-            AsyncResult's value. Receives ``None`` after a timeout.
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
-        future = Future()
+        future = _TimeoutFuture(deadline, self.io_loop)
         if self.ready():
             future.set_result(self.value)
-            if callback:
-                callback(self.value)
         else:
-            self.waiters.append(
-                _FutureWaiter(deadline, NotReady, self.io_loop, future))
-
-            if callback:
-                # After timeout, callback will be passed None
-                self.waiters.append(
-                    _Waiter(deadline, (None,), self.io_loop, callback))
+            self.waiters.append(future)
 
         return future
 
@@ -257,8 +160,8 @@ class AsyncResult(ToroBase):
             raise NotReady
 
 
-class Condition(ToroBase):
-    """A condition allows one or more callbacks to wait until they are notified.
+class Condition(object):
+    """A condition allows one or more coroutines to wait until notified.
 
     Like a standard Condition_, but does not need an underlying lock that
     is acquired and released.
@@ -268,9 +171,10 @@ class Condition(ToroBase):
     :Parameters:
       - `io_loop`: Optional custom IOLoop.
     """
+
     def __init__(self, io_loop=None):
-        super(Condition, self).__init__(io_loop)
-        self.waiters = collections.deque([]) # Queue of _Waiter objects
+        self.io_loop = io_loop or ioloop.IOLoop.current()
+        self.waiters = collections.deque()  # Queue of _Waiter objects
 
     def __str__(self):
         result = '<%s' % (self.__class__.__name__, )
@@ -278,20 +182,19 @@ class Condition(ToroBase):
             result += ' waiters[%s]' % len(self.waiters)
         return result + '>'
 
-    def wait(self, callback, deadline=None):
-        """Register a callback to be executed after :meth:`notify`.
+    def wait(self, deadline=None):
+        """Wait for :meth:`notify`. Returns a Future.
 
-        .. note:: If you set a deadline, there is no way to determine whether
-           `callback` was run because of a notify or a timeout.
+        :exc:`~toro.Timeout` is executed after a timeout.
 
         :Parameters:
-          - `callback`: Function taking no arguments.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        self.waiters.append(
-            _Waiter(deadline, (), self.io_loop, callback))
+        future = _TimeoutFuture(deadline, self.io_loop)
+        self.waiters.append(future)
+        return future
 
     def notify(self, n=1):
         """Wake up `n` waiters.
@@ -299,30 +202,26 @@ class Condition(ToroBase):
         :Parameters:
           - `n`: The number of waiters to awaken (default: 1)
         """
-        self._consume_expired_waiters(self.waiters)
-
         waiters = []  # Waiters we plan to run right now
         while n and self.waiters:
             waiter = self.waiters.popleft()
-            n -= 1
-            waiters.append(waiter)
-            self._consume_expired_waiters(self.waiters)
+            if not waiter.done():  # Might have timed out
+                n -= 1
+                waiters.append(waiter)
 
         for waiter in waiters:
-            waiter.run()
+            waiter.set_result(None)
 
     def notify_all(self):
         """Wake up all waiters."""
         self.notify(len(self.waiters))
 
 
-class Event(ToroBase):
-    """A synchronization primitive that allows one task to wake up one or more others.
-    It has a similar interface as threading.Event_.
+# TODO: show correct examples that avoid thread / process issues w/ concurrent.futures.Future
+class Event(object):
+    """An event blocks coroutines until its internal flag is set to True.
 
-    An Event object manages an internal flag that can be set to true with
-    the :meth:`set` method and reset to false with the :meth:`clear` method.
-    The :meth:`wait` method blocks until the flag is true.
+    Similar to threading.Event_.
 
     .. _threading.Event: http://docs.python.org/library/threading.html#threading.Event
 
@@ -331,13 +230,15 @@ class Event(ToroBase):
     :Parameters:
       - `io_loop`: Optional custom IOLoop.
     """
+
     def __init__(self, io_loop=None):
-        super(Event, self).__init__(io_loop)
-        self.condition = Condition(io_loop)
+        self.io_loop = io_loop or ioloop.IOLoop.current()
+        self.condition = Condition(io_loop=io_loop)
         self._flag = False
 
     def __str__(self):
-        return '<%s %s>' % (self.__class__.__name__, (self._flag and 'set') or 'clear')
+        return '<%s %s>' % (
+            self.__class__.__name__, 'set' if self._flag else 'clear')
 
     def is_set(self):
         """Return ``True`` if and only if the internal flag is true."""
@@ -351,20 +252,15 @@ class Event(ToroBase):
         self.condition.notify_all()
 
     def clear(self):
-        """Reset the internal flag to ``False``. Subsequently, calls to :meth:`wait`
-        will block until :meth:`set` is called to set the internal flag to true again.
+        """Reset the internal flag to ``False``. Calls to :meth:`wait`
+        will block until :meth:`set` is called.
         """
         self._flag = False
 
-    def wait(self, callback, deadline=None):
-        """Block until the internal flag is true.
-        If the flag is already true, the callback is run immediately.
-        Otherwise, block until the deadline, or until another task
-        calls :meth:`set` to set the flag to true.
+    def wait(self, deadline=None):
+        """Block until the internal flag is true. Returns a Future.
 
-        .. note:: If you set a deadline, you can determine whether
-           `callback` was run because of a :meth:`set` or a timeout by
-           checking :meth:`is_set`.
+        The Future raises :exc:`~toro.Timeout` after a timeout.
 
         :Parameters:
           - `callback`: Function taking no arguments.
@@ -372,23 +268,22 @@ class Event(ToroBase):
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
+        future = _TimeoutFuture(deadline, self.io_loop)
         if self._flag:
-            self._next_tick(callback)
+            future.set_result(None)
         else:
-            self.condition.wait(callback, deadline)
+            future.link(self.condition.wait())
+
+        return future
 
 
-class Queue(ToroBase):
+class Queue(object):
     """Create a queue object with a given maximum size.
 
-    If `maxsize` is ``None`` (the default) the queue size is unbounded.
+    If `maxsize` is 0 (the default) the queue size is unbounded.
 
-    ``Queue(0)`` is a channel, that is, its :meth:`put` method always blocks until the
-    item is delivered. (This emulates `Gevent's Queue`_, but is unlike the
-    `standard Queue`_, where 0 means infinite size).
-
-    Also unlike the `standard Queue`_, you can reliably know this Queue's
-    size with :meth:`qsize`, since your single-threaded Tornado application won't
+    Unlike the `standard Queue`_, you can reliably know this Queue's size
+    with :meth:`qsize`, since your single-threaded Tornado application won't
     be interrupted between calling :meth:`qsize` and doing an operation on the
     Queue.
 
@@ -400,27 +295,30 @@ class Queue(ToroBase):
 
     :Parameters:
       - `maxsize`: Optional size limit (no limit by default).
-      - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
 
     .. _`Gevent's Queue`: http://www.gevent.org/gevent.queue.html
 
     .. _`standard Queue`: http://docs.python.org/library/queue.html#Queue.Queue
     """
-    def __init__(self, maxsize=None, initial=None, io_loop=None):
-        super(Queue, self).__init__(io_loop)
-        if maxsize is not None and maxsize < 0:
+    def __init__(self, maxsize=0, io_loop=None):
+        self.io_loop = io_loop or ioloop.IOLoop.current()
+        if maxsize is None:
+            raise TypeError("maxsize can't be None")
+
+        if maxsize < 0:
             raise ValueError("maxsize can't be negative")
+
         self._maxsize = maxsize
 
-        # _Waiters
+        # _TimeoutFutures
         self.getters = collections.deque([])
-        # Pairs of (item, _Waiter)
+        # Pairs of (item, _TimeoutFuture)
         self.putters = collections.deque([])
-        self._init(maxsize, initial)
+        self._init(maxsize)
 
-    def _init(self, maxsize, initial):
-        self.queue = collections.deque(initial or [])
+    def _init(self, maxsize):
+        self.queue = collections.deque()
 
     def _get(self):
         return self.queue.popleft()
@@ -429,13 +327,14 @@ class Queue(ToroBase):
         self.queue.append(item)
 
     def __repr__(self):
-        return '<%s at %s %s>' % (type(self).__name__, hex(id(self)), self._format())
+        return '<%s at %s %s>' % (
+            type(self).__name__, hex(id(self)), self._format())
 
     def __str__(self):
         return '<%s %s>' % (type(self).__name__, self._format())
 
     def _format(self):
-        result = 'maxsize=%r' % (self.maxsize, )
+        result = 'maxsize=%r' % (self.maxsize(), )
         if getattr(self, 'queue', None):
             result += ' queue=%r' % self.queue
         if self.getters:
@@ -446,48 +345,16 @@ class Queue(ToroBase):
 
     def _consume_expired_putters(self):
         # Delete waiters at the head of the queue who've timed out
-        while self.putters and self.putters[0][1].expired:
+        while self.putters and self.putters[0][1].done():
             self.putters.popleft()
 
     def qsize(self):
         """Number of items in the queue"""
         return len(self.queue)
 
-    def get_maxsize(self):
-        """Number of items allowed in the queue.
-
-        Setting maxsize to a larger number unblocks callbacks waiting
-        on :meth:`put`. Decreasing maxsize below :meth:`qsize`
-        raises :exc:`RuntimeError`:
-
-        >>> from tornado import gen
-        >>> q = toro.Queue(0)
-        >>> @gen.engine
-        ... def f():
-        ...     print 'Trying to put...'
-        ...     yield gen.Task(q.put, 'a')
-        ...     print 'Done putting'
-        ...
-        >>> f()
-        Trying to put...
-        >>> q.maxsize = 1
-        Done putting
-        """
+    def maxsize(self):
+        """Number of items allowed in the queue."""
         return self._maxsize
-
-    def set_maxsize(self, maxsize):
-        if maxsize < self.qsize():
-            raise RuntimeError("%s has %d items, can't set maxsize to %d" % (
-                repr(self), self.qsize(), maxsize))
-
-        self._maxsize = maxsize
-        while self.qsize() < maxsize and self.putters:
-            item, putter = self.putters.popleft()
-            if not putter.expired:
-                self._put(item)
-                putter.run(True)
-
-    maxsize = property(get_maxsize, set_maxsize)
 
     def empty(self):
         """Return ``True`` if the queue is empty, ``False`` otherwise."""
@@ -496,102 +363,103 @@ class Queue(ToroBase):
     def full(self):
         """Return ``True`` if there are `maxsize` items in the queue.
 
-        .. note:: if the Queue was initialized with `maxsize=None`
+        .. note:: if the Queue was initialized with `maxsize=0`
           (the default), then :meth:`full` is never ``True``.
         """
-        if self.maxsize is None:
+        if self.maxsize() == 0:
             return False
-        elif self.maxsize == 0:
-            return True
         else:
-            return self.qsize() == self.maxsize
+            return self.qsize() == self.maxsize()
 
-    def put(self, item, callback=None, deadline=None):
-        """Put an item into the queue.
+    def put(self, item, deadline=None):
+        """Put an item into the queue. Returns a Future.
 
-        If you pass a callback and `deadline` is ``None`` (the default),
-        wait until a free slot is available before adding `item` and executing
-        the callback with the argument ``True``.
-
-        If there's a waiting callback registered with :meth:`get`,
-        it receives the item and runs **before** the callback registered
-        with :meth:`put`.
-
-        If `deadline` is a timestamp or timedelta, the callback is passed
-        ``False`` if no free slot becomes available before the deadline.
-
-        Without a callback, this method puts an item on the queue if a free slot
-        is immediately available, else raises the ``Queue.Full`` exception.
-        `deadline` is ignored.
+        The Future blocks until a free slot is available for `item`, or raises
+        :exc:`toro.Timeout`.
 
         :Parameters:
-          - `callback`: Optional callback taking one argument, run after a
-            waiter registered with :meth:`get`.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        self._consume_expired_waiters(self.getters)
+        _consume_expired_waiters(self.getters)
+        future = _TimeoutFuture(deadline, self.io_loop)
+        if self.getters:
+            assert not self.queue, "queue non-empty, why are getters waiting?"
+            getter = self.getters.popleft()
+
+            # Use _put and _get instead of passing item straight to getter, in
+            # case a subclass has logic that must run (e.g. JoinableQueue).
+            self._put(item)
+            getter.set_result(self._get())
+            future.set_result(None)
+        else:
+            if self.maxsize() and self.maxsize() == self.qsize():
+                self.putters.append((item, future))
+            else:
+                self._put(item)
+                future.set_result(None)
+
+        return future
+
+    def put_nowait(self, item):
+        """Put an item into the queue without blocking.
+
+        If no free slot is immediately available, raise queue.Full.
+        """
+        _consume_expired_waiters(self.getters)
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
             getter = self.getters.popleft()
 
             self._put(item)
-            getter.run(self._get())
-            self._run_callback(callback, True)
-        elif self.maxsize == self.qsize() and callback:
-            _check_callback(callback)
-            waiter = _Waiter(deadline, (Full,), self.io_loop, callback)
-            self.putters.append((item, waiter))
-        elif self.maxsize == self.qsize():
+            getter.set_result(self._get())
+        elif self.maxsize() and self.maxsize() == self.qsize():
             raise Full
         else:
             self._put(item)
-            self._run_callback(callback, True)
 
-    def get(self, callback=None, deadline=None):
-        """Remove and return an item from the queue.
+    def get(self, deadline=None):
+        """Remove and return an item from the queue. Returns a Future.
 
-        If you pass a callback and `deadline` is ``None`` (the default),
-        the callback is passed an item as soon as one is available.
-
-        If `deadline` is a timestamp or timedelta, the callback is passed
-        the exception ``Queue.Empty`` if no item becomes available before the
-        deadline.
-
-        Without a callback, this method returns an item if one is immediately
-        available, else raises exception ``Queue.Full``. `deadline` is ignored.
+        The Future blocks until an item is available, or raises
+        :exc:`toro.Timeout`.
 
         :Parameters:
-          - `callback`: Optional callback taking one argument, run after a
-            waiter registered with :meth:`put`.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
+        """
+        self._consume_expired_putters()
+        future = _TimeoutFuture(deadline, self.io_loop)
+        if self.putters:
+            assert self.full(), "queue not full, why are putters waiting?"
+            item, putter = self.putters.popleft()
+            self._put(item)
+            putter.set_result(None)
+            future.set_result(self._get())
+        elif self.qsize():
+            future.set_result(self._get())
+        else:
+            self.getters.append(future)
+
+        return future
+
+    def get_nowait(self):
+        """Remove and return an item from the queue without blocking.
+
+        Return an item if one is immediately available, else raise
+        :exc:`queue.Full`.
         """
         self._consume_expired_putters()
         if self.putters:
             assert self.full(), "queue not full, why are putters waiting?"
             item, putter = self.putters.popleft()
             self._put(item)
-            if callback:
-                self._run_callback(callback, self._get())
-                # When a getter runs and frees up a slot so this putter can
-                # run, we need to defer the put callback for an iteration
-                # of the loop to ensure that getters and putters alternate
-                # perfectly. See TestChannel2.test_wait.
-                self.io_loop.add_callback(partial(putter.run, True))
-            else:
-                self.io_loop.add_callback(partial(putter.run, True))
-                return self._get()
+            putter.set_result(None)
+            return self._get()
         elif self.qsize():
-            if callback:
-                self._run_callback(callback, self._get())
-            else:
-                return self._get()
-        elif callback:
-            self.getters.append(
-                _Waiter(deadline, (Empty,), self.io_loop, callback))
+            return self._get()
         else:
             raise Empty
 
@@ -607,8 +475,8 @@ class PriorityQueue(Queue):
       - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
-    def _init(self, maxsize, initial):
-        self.queue = list(initial or [])
+    def _init(self, maxsize):
+        self.queue = []
 
     def _put(self, item, heappush=heapq.heappush):
         heappush(self.queue, item)
@@ -626,8 +494,8 @@ class LifoQueue(Queue):
       - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
-    def _init(self, maxsize, initial):
-        self.queue = list(initial or [])
+    def _init(self, maxsize):
+        self.queue = []
 
     def _put(self, item):
         self.queue.append(item)
@@ -647,7 +515,7 @@ class JoinableQueue(Queue):
       - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
-    def __init__(self, maxsize=None, io_loop=None):
+    def __init__(self, maxsize=0, io_loop=None):
         Queue.__init__(self, maxsize=maxsize, io_loop=io_loop)
         self.unfinished_tasks = 0
         self._finished = Event(io_loop)
@@ -681,33 +549,38 @@ class JoinableQueue(Queue):
         if self.unfinished_tasks == 0:
             self._finished.set()
 
-    def join(self, callback, deadline=None):
-        """Block until all items in the queue have been gotten and processed.
+    def join(self, deadline=None):
+        """Block until all items in the queue are processed. Returns a Future.
 
-        The count of unfinished tasks goes up whenever an item is added to the queue.
-        The count goes down whenever a consumer thread calls :meth:`task_done` to indicate
-        that the item was retrieved and all work on it is complete. When the count of
-        unfinished tasks drops to zero, :meth:`join` unblocks.
+        The count of unfinished tasks goes up whenever an item is added to
+        the queue. The count goes down whenever a consumer calls
+        :meth:`task_done` to indicate that all work on the item is complete.
+        When the count of unfinished tasks drops to zero, :meth:`join`
+        unblocks.
 
-        If `deadline` is not None, the callback may be executed before all tasks
-        are complete. Check the value of unfinished_tasks after a join() with a
-        deadline to determine if this has happened.
+        The Future raises :exc:`toro.Timeout` if the count is not zero before
+        the deadline.
 
         :Parameters:
-          - `callback`: Function taking no arguments.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
+        future = _TimeoutFuture(deadline, self.io_loop)
         if self.unfinished_tasks == 0:
-            self._next_tick(callback)
+            future.set_result(None)
         else:
-            self._finished.wait(callback, deadline)
+            future.link(self._finished.wait())
+
+        return future
 
 
 class Semaphore(object):
-    """A semaphore manages a counter representing the number of release() calls minus the number of acquire() calls,
-    plus an initial value. The acquire() method blocks if necessary until it can return without making the counter
+    """A lock that can be acquired a fixed number of times before blocking.
+
+    A Semaphore manages a counter representing the number of release() calls
+    minus the number of acquire() calls, plus an initial value. The acquire()
+    method blocks if necessary until it can return without making the counter
     negative.
 
     If not given, value defaults to 1.
@@ -727,17 +600,20 @@ class Semaphore(object):
     """
     def __init__(self, value=1, io_loop=None):
         if value < 0:
-            raise ValueError("semaphore initial value must be >= 0")
+            raise ValueError('semaphore initial value must be >= 0')
 
         # The semaphore is implemented as a Queue with 'value' objects
-        self.q = Queue(None, [None] * value, io_loop)
+        self.q = Queue(io_loop=io_loop)
+        for _ in range(value):
+            self.q.put_nowait(None)
 
-        self._unlocked = Event(io_loop)
+        self._unlocked = Event(io_loop=io_loop)
         if value:
             self._unlocked.set()
 
     def __repr__(self):
-        return '<%s at %s%s>' % (type(self).__name__, hex(id(self)), self._format())
+        return '<%s at %s%s>' % (
+            type(self).__name__, hex(id(self)), self._format())
 
     def __str__(self):
         return '<%s%s>' % (
@@ -756,69 +632,53 @@ class Semaphore(object):
         return self.q.empty()
 
     def release(self):
-        """Increment :attr:`counter` and wake one waiter blocking
-        on :meth:`acquire`.
+        """Increment :attr:`counter` and wake one waiter.
         """
         self.q.put(None)
         if not self.locked():
             # No one was waiting on acquire(), so self.q.qsize() is positive
             self._unlocked.set()
 
-    def wait(self, callback, deadline=None):
-        """Wait for :attr:`locked` to be False
+    def wait(self, deadline=None):
+        """Wait for :attr:`locked` to be False. Returns a Future.
 
-        .. note:: If you set a deadline, you can determine whether
-           `callback` was run because of a :meth:`release` or a timeout by
-           checking :meth:`locked`.
+        The Future raises :exc:`toro.Timeout` after the deadline.
 
         :Parameters:
-          - `callback`: Function taking no arguments.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        self._unlocked.wait(callback, deadline)
+        return self._unlocked.wait(deadline)
 
-    def acquire(self, callback=None, deadline=None):
-        """If a callback is passed, then decrement :attr:`counter` and run
-        the callback. If the counter is zero, wait for
-        a :meth:`release` or a timeout before running the callback.
-        If `deadline` is not ``None``, then the callback is passed ``False`` if
-        it times out before another coroutine calls :meth:`release`.
+    def acquire(self, deadline=None):
+        """Decrement :attr:`counter`. Returns a Future.
 
-        If no callback is passed, then if the counter is zero return ``False``,
-        else if the counter is positive decrement it and return ``True``.
+        Block if the counter is zero and wait for a :meth:`release`. The
+        Future raises :exc:`toro.Timeout` after the deadline.
 
         :Parameters:
-          - `callback`: Optional function taking one argument.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        if callback:
-            _check_callback(callback)
-            # The Queue will return Empty on timeout, else None. Transform
-            # those values into False or True.
-            self.q.get(lambda value: callback(value is not Empty), deadline)
-        else:
-            try:
-                self.q.get()
-                return True
-            except Empty:
-                return False
+        return self.q.get(deadline)
 
 
 class BoundedSemaphore(Semaphore):
-    """A bounded semaphore checks to make sure its current value doesn't exceed its initial value.
-    If it does, ``ValueError`` is raised. In most situations semaphores are used to guard resources
-    with limited capacity. If the semaphore is released too many times it's a sign of a bug.
+    """A semaphore that prevents release() being called too often.
+
+    A bounded semaphore checks to make sure its current value doesn't exceed
+    its initial value. If it does, ``ValueError`` is raised. In most
+    situations semaphores are used to guard resources with limited capacity.
+    If the semaphore is released too many times it's a sign of a bug.
 
     If not given, *value* defaults to 1.
 
     .. seealso:: :doc:`examples/web_spider_example`
     """
     def __init__(self, value=1, io_loop=None):
-        super(BoundedSemaphore, self).__init__(value, io_loop)
+        super(BoundedSemaphore, self).__init__(value=value, io_loop=io_loop)
         self._initial_value = value
 
     def release(self):
@@ -827,18 +687,28 @@ class BoundedSemaphore(Semaphore):
         return super(BoundedSemaphore, self).release()
 
 
-class Lock(object):
-    """A lock is in one of two states, "locked" or "unlocked".
-    It is created unlocked.
-    When unlocked, :meth:`acquire` changes the state to locked and runs its callback immediately.
-    When the state is locked, the callback passed to :meth:`acquire` waits until a call to :meth:`release`.
+class Lock(gen.YieldPoint):
+    """A lock for coroutines.
+
+    It is created unlocked. When unlocked, :meth:`acquire` changes the state
+    to locked. When the state is locked, yielding :meth:`acquire` waits until
+    a call to :meth:`release`.
 
     The :meth:`release` method should only be called in the locked state;
-    it changes the state to unlocked and returns immediately.
-    If an attempt is made to release an unlocked lock, a RuntimeError will be raised.
+    an attempt to release an unlocked lock raises RuntimeError.
 
-    When more than one callback is waiting to acquire the lock,
-    the first one registered is called by :meth:`release`.
+    When more than one coroutine is waiting for the lock, the first one
+    registered is awakened by :meth:`release`.
+
+    Locks also support the context manager protocol:
+    # TODO: implement
+
+    >>> import toro
+    >>> lock = toro.Lock()
+    >>> with (yield lock):
+    ...    assert lock.locked()
+    ...
+    >>> assert not lock.locked()
 
     .. note:: Unlike with the standard threading.Lock_, code in a
       single-threaded Tornado application can check if a :class:`Lock`
@@ -846,47 +716,34 @@ class Lock(object):
       thread has grabbed the lock, provided you do not yield to the IOLoop
       between checking :meth:`locked` and using a protected resource.
 
-    .. note:: This class is not a context manager, and cannot be used in a
-      with-statement the way Python's standard Lock can, because with-statements
-      don't work with callbacks.
-
-    .. _threading.Lock: http://docs.python.org/library/threading.html#threading.Lock
-
     :Parameters:
       - `io_loop`: Optional custom IOLoop.
     """
     def __init__(self, io_loop=None):
-        self._block = BoundedSemaphore(1, io_loop)
+        self._block = BoundedSemaphore(value=1, io_loop=io_loop)
 
     def __str__(self):
         return "<%s _block=%s>" % (
             self.__class__.__name__,
             self._block)
 
-    def acquire(self, callback=None, deadline=None):
-        """Attempt to lock.
+    def acquire(self, deadline=None):
+        """Attempt to lock. Returns a Future.
 
-        When invoked with a callback, the callback waits for the lock to be
-        released, then is passed ``True``. If `deadline` is not ``None``, then
-        the callback is passed ``False`` if it times out without acquiring the
-        lock.
-
-        Without a callback, if locked return False immediately;
-        otherwise, lock and return True.
+        The Future raises :exc:`toro.Timeout` if the deadline passes.
 
         :Parameters:
-          - `callback`: Function taking one argument.
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        return self._block.acquire(callback, deadline)
+        return self._block.acquire(deadline)
 
     def release(self):
         """Unlock.
 
-        If any callbacks are waiting, the first one registered
-        with :meth:`acquire` is passed ``True``.
+        If any coroutines are waiting for :meth:`acquire`,
+        the first in line is awakened.
 
         If not locked, raise a RuntimeError.
         """
