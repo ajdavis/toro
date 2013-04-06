@@ -334,7 +334,7 @@ class Queue(object):
         return '<%s %s>' % (type(self).__name__, self._format())
 
     def _format(self):
-        result = 'maxsize=%r' % (self.maxsize(), )
+        result = 'maxsize=%r' % (self.maxsize, )
         if getattr(self, 'queue', None):
             result += ' queue=%r' % self.queue
         if self.getters:
@@ -352,6 +352,7 @@ class Queue(object):
         """Number of items in the queue"""
         return len(self.queue)
 
+    @property
     def maxsize(self):
         """Number of items allowed in the queue."""
         return self._maxsize
@@ -366,10 +367,10 @@ class Queue(object):
         .. note:: if the Queue was initialized with `maxsize=0`
           (the default), then :meth:`full` is never ``True``.
         """
-        if self.maxsize() == 0:
+        if self.maxsize == 0:
             return False
         else:
-            return self.qsize() == self.maxsize()
+            return self.qsize() == self.maxsize
 
     def put(self, item, deadline=None):
         """Put an item into the queue. Returns a Future.
@@ -394,7 +395,7 @@ class Queue(object):
             getter.set_result(self._get())
             future.set_result(None)
         else:
-            if self.maxsize() and self.maxsize() == self.qsize():
+            if self.maxsize and self.maxsize == self.qsize():
                 self.putters.append((item, future))
             else:
                 self._put(item)
@@ -414,7 +415,7 @@ class Queue(object):
 
             self._put(item)
             getter.set_result(self._get())
-        elif self.maxsize() and self.maxsize() == self.qsize():
+        elif self.maxsize and self.maxsize == self.qsize():
             raise Full
         else:
             self._put(item)

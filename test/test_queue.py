@@ -293,8 +293,12 @@ class TestQueue3(AsyncTestCase):
         self.assertRaises(ValueError, toro.Queue, -1)
 
     def test_full(self):
-        self.assertFalse(toro.Queue().full())
+        q = toro.Queue()
+        self.assertFalse(q.full())
+        self.assertEqual(q.maxsize, 0)
+
         q = toro.Queue(1)
+        self.assertEqual(q.maxsize, 1)
         self.assertFalse(q.full())
         q.put('foo')
         self.assertTrue(q.full())
