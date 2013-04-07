@@ -34,7 +34,11 @@ Tulip compatibility:
     no longer a valid maxsize.
   - The ``initial`` argument to Queue() was removed.
   - maxsize can no longer be changed after a Queue is created.
-  - :class:`~toro.Lock` can now be used as a context manager.
+
+The chief difference between Toro and Tulip's locks and queues is that Toro
+uses ``yield`` instead of ``yield from``, and that Toro's :class:`~toro.Lock`
+and :class:`~toro.Semaphore` aren't context managers (they can't be used with
+a ``with`` statement).
 
 .. _Futures: http://www.tornadoweb.org/en/stable/concurrent.html#tornado.concurrent.Future
 

@@ -701,16 +701,6 @@ class Lock(gen.YieldPoint):
     When more than one coroutine is waiting for the lock, the first one
     registered is awakened by :meth:`release`.
 
-    Locks also support the context manager protocol:
-    # TODO: implement
-
-    >>> import toro
-    >>> lock = toro.Lock()
-    >>> with (yield lock):
-    ...    assert lock.locked()
-    ...
-    >>> assert not lock.locked()
-
     .. note:: Unlike with the standard threading.Lock_, code in a
       single-threaded Tornado application can check if a :class:`Lock`
       is :meth:`locked`, and act on that information without fear that another
