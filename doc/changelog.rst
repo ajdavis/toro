@@ -22,7 +22,7 @@ Added support for Tornado 3's Futures_:
     timeout, all now return a Future that raises :exc:`toro.Timeout` after the
     deadline.
 
-Tulip compatibility:
+Tulip emulation:
   - Toro's API has been updated to closely match the locks and queues in
     Tulip_.
   - The requirement has been dropped that a coroutine that calls
@@ -35,10 +35,20 @@ Tulip compatibility:
   - The ``initial`` argument to Queue() was removed.
   - maxsize can no longer be changed after a Queue is created.
 
-The chief difference between Toro and Tulip's locks and queues is that Toro
-uses ``yield`` instead of ``yield from``, and that Toro's :class:`~toro.Lock`
-and :class:`~toro.Semaphore` aren't context managers (they can't be used with
-a ``with`` statement).
+The chief differences between Toro and Tulip are that Toro uses ``yield``
+instead of ``yield from``, that Toro uses absolute deadlines instead of
+relative timeouts. Additionally, Toro's :class:`~toro.Lock` and
+:class:`~toro.Semaphore` aren't context managers (they can't be used with a
+``with`` statement); instead, the Futures returned from
+:meth:`~toro.Lock.acquire` and :meth:`~toro.Semaphore.acquire` are context
+managers:
+
+    >>> import toro
+    >>> lock = toro.Lock()
+    >>> with (yield lock.acquire()):
+    ...    assert lock.locked()
+    ...
+    >>> assert not lock.locked()
 
 .. _Futures: http://www.tornadoweb.org/en/stable/concurrent.html#tornado.concurrent.Future
 

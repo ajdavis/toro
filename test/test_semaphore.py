@@ -12,7 +12,7 @@ from tornado import gen
 from tornado.testing import gen_test, AsyncTestCase
 
 import toro
-from test import make_callback
+from test import make_callback, ContextManagerTestsMixin
 
 
 # Adapted from Gevent's lock_tests.py
@@ -236,3 +236,8 @@ class SemaphoreTests2(AsyncTestCase):
             # Third release wakes all waits
             'wait1', 'wait2', 'release3'
         ], history)
+
+
+class SemaphoreContextManagerTest(ContextManagerTestsMixin, AsyncTestCase):
+
+    toro_class = toro.Semaphore

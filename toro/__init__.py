@@ -1,3 +1,4 @@
+import contextlib
 import heapq
 import collections
 from functools import partial
@@ -80,6 +81,45 @@ class _TimeoutFuture(Future):
         if self._timeout_handle:
             self.io_loop.remove_timeout(self._timeout_handle)
             self._timeout_handle = None
+
+
+# TODO: doc
+class _ContextManagerFuture(Future):
+    def __init__(self, wrapped, exit_callback):
+        super(_ContextManagerFuture, self).__init__()
+        wrapped.add_done_callback(self._done_callback)
+        self.exit_callback = exit_callback
+
+    def _done_callback(self, wrapped):
+        self.set_result(wrapped.result())
+
+    def result(self):
+        @contextlib.contextmanager
+        def f():
+            # TODO: needed?
+            try:
+                yield
+            finally:
+                self.exit_callback()
+        return f()
+
+    def exception(self):
+        return self.wrapped.exception()
+    #
+    # def add_done_callback(self, fn):
+    #     self.wrapped.add_done_callback(fn)
+    #
+    # def set_result(self, result):
+    #     self.wrapped.set_result(result)
+    #
+    # def set_exception(self, exception):
+    #     self.wrapped.set_exception(exception)
+    #
+    # def __enter__(self):
+    #     return self.target
+    #
+    # def __exit__(self, exc_type, exc_val, exc_tb):
+    #     self.exit_callback()
 
 
 def _consume_expired_waiters(waiters):
@@ -586,6 +626,15 @@ class Semaphore(object):
 
     If not given, value defaults to 1.
 
+    :meth:`acquire` supports the context manager protocol:
+
+    >>> import toro
+    >>> sem = toro.Semaphore()
+    >>> with (yield sem.acquire()):
+    ...    assert sem.locked()
+    ...
+    >>> assert not sem.locked()
+
     .. note:: Unlike the standard threading.Semaphore_, a :class:`Semaphore`
       can tell you the current value of its :attr:`counter`, because code in a
       single-threaded Tornado app can check these values and act upon them
@@ -663,7 +712,16 @@ class Semaphore(object):
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        return self.q.get(deadline)
+        queue_future = self.q.get(deadline)
+        future = _ContextManagerFuture(queue_future, self.release)
+        return future
+
+    def __enter__(self):
+        raise RuntimeError(
+            "Use Semaphore like 'with (yield semaphore)', not like"
+            " 'with semaphore'")
+
+    __exit__ = __enter__
 
 
 class BoundedSemaphore(Semaphore):
@@ -688,7 +746,7 @@ class BoundedSemaphore(Semaphore):
         return super(BoundedSemaphore, self).release()
 
 
-class Lock(gen.YieldPoint):
+class Lock(object):
     """A lock for coroutines.
 
     It is created unlocked. When unlocked, :meth:`acquire` changes the state
@@ -700,6 +758,15 @@ class Lock(gen.YieldPoint):
 
     When more than one coroutine is waiting for the lock, the first one
     registered is awakened by :meth:`release`.
+
+    :meth:`acquire` supports the context manager protocol:
+
+    >>> import toro
+    >>> lock = toro.Lock()
+    >>> with (yield lock.acquire()):
+    ...    assert lock.locked()
+    ...
+    >>> assert not lock.locked()
 
     .. note:: Unlike with the standard threading.Lock_, code in a
       single-threaded Tornado application can check if a :class:`Lock`
@@ -745,3 +812,10 @@ class Lock(gen.YieldPoint):
     def locked(self):
         """``True`` if the lock has been acquired"""
         return self._block.locked()
+
+    def __enter__(self):
+        raise RuntimeError(
+            "Use Lock like 'with (yield lock)', not like"
+            " 'with lock'")
+
+    __exit__ = __enter__

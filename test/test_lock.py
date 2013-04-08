@@ -12,7 +12,7 @@ from tornado.testing import gen_test, AsyncTestCase
 
 
 import toro
-from test import make_callback
+from test import make_callback, ContextManagerTestsMixin
 
 
 # Adapted from Gevent's lock_tests.py.
@@ -105,19 +105,7 @@ class LockTests2(AsyncTestCase):
         lock.release()
         self.assertRaises(RuntimeError, lock.release)
 
-    @gen_test
-    def test_context_manager(self):
-        lock = toro.Lock()
-        with (yield lock) as yielded:
-            self.assertTrue(lock.locked())
-            self.assertTrue(yielded is lock)
 
-        self.assertFalse(lock.locked())
+class LockContextManagerTest(ContextManagerTestsMixin, AsyncTestCase):
 
-    def test_context_manager_misuse(self):
-        lock = toro.Lock()
-
-        # Ensure we catch a "with lock", which should be "with (yield lock)"
-        with self.assertRaises(RuntimeError):
-            with lock:
-                pass
+    toro_class = toro.Lock
