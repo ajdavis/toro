@@ -4,7 +4,7 @@ import collections
 from functools import partial
 from Queue import Full, Empty
 
-from tornado import ioloop, gen
+from tornado import ioloop
 from tornado.concurrent import Future
 
 
@@ -39,7 +39,8 @@ class AlreadySet(Exception):
 
 
 class Timeout(Exception):
-    pass
+    def __str__(self):
+        return "Timeout"
 
 
 class _TimeoutFuture(Future):
@@ -83,8 +84,18 @@ class _TimeoutFuture(Future):
             self._timeout_handle = None
 
 
-# TODO: doc
 class _ContextManagerFuture(Future):
+    """A Future that can be used with the "with" statement.
+
+    When a coroutine yields this Future, the return value is a context manager
+    that can be used like:
+
+        with (yield future):
+            pass
+
+    At the end of the block, the Future's exit callback is run. Used for
+    Lock.acquire() and Semaphore.acquire().
+    """
     def __init__(self, wrapped, exit_callback):
         super(_ContextManagerFuture, self).__init__()
         wrapped.add_done_callback(self._done_callback)
@@ -96,30 +107,11 @@ class _ContextManagerFuture(Future):
     def result(self):
         @contextlib.contextmanager
         def f():
-            # TODO: needed?
             try:
                 yield
             finally:
                 self.exit_callback()
         return f()
-
-    def exception(self):
-        return self.wrapped.exception()
-    #
-    # def add_done_callback(self, fn):
-    #     self.wrapped.add_done_callback(fn)
-    #
-    # def set_result(self, result):
-    #     self.wrapped.set_result(result)
-    #
-    # def set_exception(self, exception):
-    #     self.wrapped.set_exception(exception)
-    #
-    # def __enter__(self):
-    #     return self.target
-    #
-    # def __exit__(self, exc_type, exc_val, exc_tb):
-    #     self.exit_callback()
 
 
 def _consume_expired_waiters(waiters):
@@ -569,20 +561,24 @@ class JoinableQueue(Queue):
         return result
 
     def _put(self, item):
-        Queue._put(self, item)
         self.unfinished_tasks += 1
         self._finished.clear()
+        Queue._put(self, item)
 
     def task_done(self):
-        """Indicate that a formerly enqueued task is complete. Used by queue consumers.
-        For each :meth:`get <Queue.get>` used to fetch a task, a subsequent call
-        to :meth:`task_done` tells the queue that the processing on the task is complete.
+        """Indicate that a formerly enqueued task is complete.
 
-        If a :meth:`join` is currently blocking, it will resume when all items have been processed
-        (meaning that a :meth:`task_done` call was received for every item that had
-        been :meth:`put <Queue.put>` into the queue).
+        Used by queue consumers. For each :meth:`get <Queue.get>` used to
+        fetch a task, a subsequent call to :meth:`task_done` tells the queue
+        that the processing on the task is complete.
 
-        Raises ``ValueError`` if called more times than there were items placed in the queue.
+        If a :meth:`join` is currently blocking, it will resume when all
+        items have been processed (meaning that a :meth:`task_done` call was
+        received for every item that had been :meth:`put <Queue.put>` into the
+        queue).
+
+        Raises ``ValueError`` if called more times than there were items
+        placed in the queue.
         """
         if self.unfinished_tasks <= 0:
             raise ValueError('task_done() called too many times')
@@ -607,13 +603,7 @@ class JoinableQueue(Queue):
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        future = _TimeoutFuture(deadline, self.io_loop)
-        if self.unfinished_tasks == 0:
-            future.set_result(None)
-        else:
-            future.link(self._finished.wait())
-
-        return future
+        return self._finished.wait(deadline)
 
 
 class Semaphore(object):

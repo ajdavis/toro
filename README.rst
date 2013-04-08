@@ -40,24 +40,25 @@ Here's a basic example (for more see the *examples* section of the docs):
 
     q = toro.JoinableQueue(maxsize=3)
 
-    @gen.engine
+    @gen.coroutine
     def consumer():
         while True:
-            item = yield gen.Task(q.get)
+            item = yield q.get()
             try:
                 print 'Doing work on', item
             finally:
                 q.task_done()
 
-    @gen.engine
+    @gen.coroutine
     def producer():
         for item in range(10):
-            yield gen.Task(q.put, item)
+            yield q.put(item)
 
     producer()
     consumer()
     loop = ioloop.IOLoop.instance()
-    q.join(callback=loop.stop) # block until all tasks are done
+    # block until all tasks are done
+    q.join().add_done_callback(loop.stop)
     loop.start()
 
 Documentation

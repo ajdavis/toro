@@ -3,7 +3,7 @@
 ``poll`` continuously fetches http://tornadoweb.org, and after 5 seconds,
 ``shutdown`` stops the IOLoop. We want any request that ``poll`` has begun to
 complete before the loop stops, so ``poll`` acquires the lock before starting
-each HTTP request and releases it when the request complets. ``shutdown`` also
+each HTTP request and releases it when the request completes. ``shutdown`` also
 acquires the lock before stopping the IOLoop.
 
 (Inspired by a post_ to the Tornado mailing list.)
@@ -17,29 +17,28 @@ from tornado import ioloop, gen, httpclient
 import toro
 
 lock = toro.Lock()
-loop = ioloop.IOLoop.instance()
+loop = ioloop.IOLoop.current()
 
-@gen.engine
+
+@gen.coroutine
 def poll():
     client = httpclient.AsyncHTTPClient()
     while True:
-        yield gen.Task(lock.acquire)
-        try:
+        with (yield lock.acquire()):
             print 'Starting request'
-            response = yield gen.Task(client.fetch, 'http://www.tornadoweb.org/')
+            response = yield client.fetch('http://www.tornadoweb.org/')
             print response.code
-        finally:
-            lock.release()
 
         # Wait a tenth of a second before next request
         yield gen.Task(loop.add_timeout, datetime.timedelta(seconds=0.1))
 
-@gen.engine
+
+@gen.coroutine
 def shutdown():
     # Get the lock: this ensures poll() isn't in a request when we stop the
     # loop
     print 'shutdown() is acquiring the lock'
-    yield gen.Task(lock.acquire)
+    yield lock.acquire()
     loop.stop()
     print 'Loop stopped.'
 

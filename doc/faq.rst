@@ -6,10 +6,10 @@ Frequently Asked Questions
 What's it for?
 --------------
 Toro makes it easy for Tornado coroutines--that is, functions decorated with
-`gen.engine`_--to coordinate using Events, Conditions, Queues, and Semaphores.
+`gen.coroutine`_--to coordinate using Events, Conditions, Queues, and Semaphores.
 Toro supports patterns in which coroutines wait for notifications from others.
 
-.. _gen.engine: http://www.tornadoweb.org/documentation/gen.html#decorator
+.. _gen.coroutine: http://www.tornadoweb.org/en/stable/gen.html#tornado.gen.coroutine
 
 Why the name?
 -------------
@@ -47,21 +47,6 @@ Instead, Toro supports complex coordination among coroutines with
 :ref:`the-wait-notify-pattern`: Some coroutines wait at particular points in
 their code for other coroutines to awaken them.
 
-Does it need gen?
------------------
-
-Toro does not directly depend on Tornado's gen_ module. Toro's primitives use
-normal callback functions, and in theory one could use Toro with callbacks
-instead of coroutines. However, Toro is intended for use in complex asynchronous
-programs. Simplifying such programs with coroutines is vehemently endorsed.
-
-See :doc:`../examples/producer_consumer_example`
-and :doc:`../examples/producer_consumer_example_callbacks`
-to compare the relative difficulty of using a :class:`Queue` with and without
-coroutines.
-
-.. _gen: http://www.tornadoweb.org/documentation/gen.html
-
 Why no RLock?
 -------------
 
@@ -70,7 +55,7 @@ a single thread without blocking, reducing the chance of deadlock, especially
 in recursive functions. The thread currently holding the RLock is the "owning
 thread."
 
-In Toro, simulating a concept like an "owning chain of callbacks" would be
+In Toro, simulating a concept like an "owning chain of coroutines" would be
 over-complicated and under-useful, so there is no RLock, only a :class:`Lock`.
 
 .. _RLock: http://docs.python.org/library/threading.html#rlock-objects

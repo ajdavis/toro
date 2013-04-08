@@ -109,12 +109,12 @@ class TestCondition(AsyncTestCase):
 
         # Wait for callback 1 to time out
         yield gen.Task(self.io_loop.add_timeout, st + .2)
-        self.assertEqual([1], history)
+        self.assertEqual([toro.Timeout], history)
 
         c.notify(2)
-        self.assertEqual([1, 0, 2], history)
+        self.assertEqual([toro.Timeout, 0, 2], history)
         c.notify()
-        self.assertEqual([1, 0, 2, 3], history)
+        self.assertEqual([toro.Timeout, 0, 2, 3], history)
 
     @gen_test
     def test_notify_all_with_timeout(self):
@@ -130,7 +130,7 @@ class TestCondition(AsyncTestCase):
 
         # Wait for callback 1 to time out
         yield gen.Task(self.io_loop.add_timeout, st + .2)
-        self.assertEqual([1], history)
+        self.assertEqual([toro.Timeout], history)
 
         c.notify_all()
-        self.assertEqual([1, 0, 2], history)
+        self.assertEqual([toro.Timeout, 0, 2], history)

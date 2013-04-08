@@ -431,3 +431,23 @@ class TestJoinableQueue3(AsyncTestCase):
         q.get().add_done_callback(callback)
         q.put('foo')
         custom_loop.start()
+
+    @gen_test
+    def test_queue_join_clear(self):
+        # Verify that join() blocks again after a task is added
+        q = toro.JoinableQueue()
+        q.put_nowait('foo')
+        q.task_done()
+
+        # The _finished Event is set
+        yield q.join()
+        yield q.join()
+
+        # Unset the event
+        q.put_nowait('bar')
+
+        with self.assertRaises(toro.Timeout):
+            yield q.join(deadline=timedelta(seconds=0.1))
+
+        q.task_done()
+        yield q.join()  # The Event is set again.

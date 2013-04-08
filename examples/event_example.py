@@ -25,21 +25,22 @@ class CacheEntry(object):
 
 cache = {}
 
+
 class ProxyHandler(web.RequestHandler):
     @web.asynchronous
-    @gen.engine
+    @gen.coroutine
     def get(self):
         path = self.request.path
         entry = cache.get(path)
         if entry:
             # Block until the event is set, unless it's set already
-            yield gen.Task(entry.event.wait)
+            yield entry.event.wait()
         else:
             print path
             cache[path] = entry = CacheEntry()
 
             # Actually fetch the page
-            response = yield gen.Task(httpclient.AsyncHTTPClient().fetch, path)
+            response = yield httpclient.AsyncHTTPClient().fetch(path)
             entry.type = response.headers.get('Content-Type', 'text/html')
             entry.body = response.body
             entry.event.set()
@@ -52,7 +53,7 @@ class ProxyHandler(web.RequestHandler):
 if __name__ == '__main__':
     print 'Listening on port 8888'
     print
-    print 'Now configure your web browser to use localhost:8888 as an HTTP Proxy.'
+    print 'Configure your web browser to use localhost:8888 as an HTTP Proxy.'
     print 'Try visiting some web pages and hitting "refresh".'
     web.Application([('.*', ProxyHandler)], debug=True).listen(8888)
     ioloop.IOLoop.instance().start()

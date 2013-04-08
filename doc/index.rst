@@ -28,7 +28,7 @@ be used in place of those from the standard library--they are meant to
 coordinate Tornado coroutines in single-threaded apps, not to protect shared
 objects in multithreaded apps.)*
 
-.. _gen: http://www.tornadoweb.org/documentation/gen.html
+.. _gen: http://www.tornadoweb.org/en/stable/gen.html
 
 .. _the-wait-notify-pattern:
 
@@ -43,25 +43,22 @@ example:
     >>> import toro
     >>> from tornado import gen
     >>> condition = toro.Condition()
-    >>> @gen.engine
-    ... def waiter(callback):
+    >>> @gen.coroutine
+    ... def waiter():
     ...     print "I'll wait right here"
-    ...     yield gen.Task(condition.wait)
+    ...     yield condition.wait()  # Yield a Future
     ...     print "I'm done waiting"
-    ...     callback()
     ...
-    >>> @gen.engine
-    ... def notifier(callback):
+    >>> @gen.coroutine
+    ... def notifier():
     ...     print "About to notify"
     ...     condition.notify()
     ...     print "Done notifying"
-    ...     callback()
     ...
-    >>> @gen.engine
+    >>> @gen.coroutine
     ... def runner():
-    ...     waiter(callback=(yield gen.Callback('waiter')))
-    ...     notifier(callback=(yield gen.Callback('notifier')))
-    ...     yield gen.WaitAll(['waiter', 'notifier'])
+    ...     # Yield two Futures; wait for waiter() and notifier() to finish
+    ...     yield waiter(), notifier()
     ...
     >>> runner()
     I'll wait right here
@@ -73,34 +70,15 @@ Wait-methods take an optional ``deadline`` argument, which is either a Unix
 timestamp (seconds since epoch)::
 
     # Wait up to 1 second for a notification
-    yield gen.Task(condition.wait, deadline=time.time() + 1)
+    yield condition.wait(deadline=time.time() + 1)
 
 ...or a ``datetime.timedelta`` for a deadline relative to the current time::
 
     # Wait up to 1 second
-    yield gen.Task(condition.wait, deadline=datetime.timedelta(seconds=1))
+    yield condition.wait(deadline=datetime.timedelta(seconds=1))
 
-When a coroutine passes a deadline to a wait-method, there are different ways
-to determine whether it was awakened by a notify-method or if it timed out; see
-:ref:`the table below <wait-notify-table>`.
-
-Some wait-methods can be called without a callback: in that case they may raise
-an exception (:meth:`AsyncResult.get` raises :exc:`NotReady`) if the
-notify-method hasn't run yet, or they return ``False``
-(:meth:`Lock.acquire` and :meth:`Semaphore.acquire`).
-
-.. _wait-notify-table:
-
-======================= ==================================  ================================= ================================ ===============================================
-Class                   Notify Method                       Wait Method                       Without Callback                 After A Timeout....
-======================= ==================================  ================================= ================================ ===============================================
-:class:`AsyncResult`    :meth:`AsyncResult.set`             :meth:`AsyncResult.get`           value / raise :exc:`NotReady`    Callback receives ``None``
-:class:`Lock`           :meth:`Lock.release`                :meth:`Lock.acquire`              ``True`` / ``False``             Callback receives ``False``
-:class:`Semaphore`      :meth:`Semaphore.release`           :meth:`Semaphore.acquire`         ``True`` / ``False``             Callback receives ``False``
-:class:`Semaphore`                                          :meth:`Semaphore.wait`            callback required                :meth:`Semaphore.locked` still ``True``
-:class:`Condition`      :meth:`Condition.notify`            :meth:`Condition.wait`            callback required                No way to know if it was a timeout
-:class:`Event`          :meth:`Event.set`                   :meth:`Event.wait`                callback required                :meth:`Event.is_set` still ``False``
-======================= ==================================  ================================= ================================ ===============================================
+If there's no notification before the deadline, the Toro-specific :exc:`Timeout`
+exception is raised.
 
 .. _the-get-put-pattern:
 
@@ -115,26 +93,14 @@ notify-method:
 * :meth:`Queue.put` waits until the queue has a free slot, and may notify a
   coroutine waiting to get an item.
 
-======================== ======================================== ======================================
-Method                   Without Callback                         After A Timeout.....
-======================== ======================================== ======================================
-:meth:`Queue.get`        returns item or raises ``Empty``         callback receives ``Empty``
-:meth:`Queue.put`        returns ``None`` or raises ``Full``      callback receives ``Full``
-======================== ======================================== ======================================
+:meth:`Queue.get` and :meth:`Queue.put` accept deadlines and raise
+:exc:`Timeout` if the deadline passes.
 
 See the :doc:`examples/producer_consumer_example`.
 
 Additionally, :class:`JoinableQueue` supports
 the wait-method :meth:`JoinableQueue.join`
-and the notify-method :meth:`JoinableQueue.task_done`:
-
-.. _join-task-done-table:
-
-======================== ==================================  ================================= ============================== ===============================================
-Class                    Notify Method                       Wait Method                       Without Callback               After A Timeout....
-======================== ==================================  ================================= ============================== ===============================================
-:class:`JoinableQueue`   :meth:`JoinableQueue.task_done`     :meth:`JoinableQueue.join`        callback required              ``JoinableQueue.unfinished_tasks > 0``
-======================== ==================================  ================================= ============================== ===============================================
+and the notify-method :meth:`JoinableQueue.task_done`.
 
 Contents
 ========
@@ -157,4 +123,3 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`search`
-

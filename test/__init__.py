@@ -12,8 +12,12 @@ gen_test.__test__ = False  # hide from Nose
 
 
 def make_callback(key, history):
-    def callback(*args):
-        history.append(key)
+    def callback(future):
+        exc = future.exception()
+        if exc:
+            history.append(exc)
+        else:
+            history.append(key)
     return callback
 
 
