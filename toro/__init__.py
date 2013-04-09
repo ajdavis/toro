@@ -18,11 +18,11 @@ __all__ = [
     # Exceptions
     'NotReady', 'AlreadySet', 'Full', 'Empty', 'Timeout',
 
-    # Classes
+    # Primitives
     'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
     'Lock',
 
-    # Queue classes
+    # Queues
     'Queue', 'PriorityQueue', 'LifoQueue', 'JoinableQueue'
 ]
 
@@ -39,6 +39,8 @@ class AlreadySet(Exception):
 
 
 class Timeout(Exception):
+    """Raised when a deadline passes before a Future is ready."""
+
     def __str__(self):
         return "Timeout"
 
@@ -134,7 +136,8 @@ class AsyncResult(object):
     """A one-time event that stores a value or an exception.
 
     The only distinction between AsyncResult and a simple Future is that
-    AsyncResult offers waiting with a timeout that each waiter can configure.
+    AsyncResult lets coroutines wait with a deadline. The deadline can be
+    configured separately for each waiter.
 
     An :class:`AsyncResult` instance cannot be reset.
 
@@ -489,7 +492,7 @@ class Queue(object):
         """Remove and return an item from the queue without blocking.
 
         Return an item if one is immediately available, else raise
-        :exc:`queue.Full`.
+        :exc:`queue.Empty`.
         """
         self._consume_expired_putters()
         if self.putters:
@@ -625,12 +628,16 @@ class Semaphore(object):
 
     :meth:`acquire` supports the context manager protocol:
 
+    >>> from tornado import gen
     >>> import toro
-    >>> sem = toro.Semaphore()
-    >>> with (yield sem.acquire()):
-    ...    assert sem.locked()
+    >>> semaphore = toro.Semaphore()
+    >>>
+    >>> @gen.coroutine
+    ... def f():
+    ...    with (yield semaphore.acquire()):
+    ...        assert semaphore.locked()
     ...
-    >>> assert not sem.locked()
+    ...    assert not semaphore.locked()
 
     .. note:: Unlike the standard threading.Semaphore_, a :class:`Semaphore`
       can tell you the current value of its :attr:`counter`, because code in a
@@ -758,18 +765,26 @@ class Lock(object):
 
     :meth:`acquire` supports the context manager protocol:
 
+    >>> from tornado import gen
     >>> import toro
     >>> lock = toro.Lock()
-    >>> with (yield lock.acquire()):
-    ...    assert lock.locked()
+    >>>
+    >>> @gen.coroutine
+    ... def f():
+    ...    with (yield lock.acquire()):
+    ...        assert lock.locked()
     ...
-    >>> assert not lock.locked()
+    ...    assert not lock.locked()
 
     .. note:: Unlike with the standard threading.Lock_, code in a
       single-threaded Tornado application can check if a :class:`Lock`
       is :meth:`locked`, and act on that information without fear that another
       thread has grabbed the lock, provided you do not yield to the IOLoop
       between checking :meth:`locked` and using a protected resource.
+
+    .. _threading.Lock: http://docs.python.org/2/library/threading.html#lock-objects
+
+    .. seealso:: :doc:`examples/lock_example`
 
     :Parameters:
       - `io_loop`: Optional custom IOLoop.

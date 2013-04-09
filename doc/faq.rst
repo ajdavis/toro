@@ -59,3 +59,31 @@ In Toro, simulating a concept like an "owning chain of coroutines" would be
 over-complicated and under-useful, so there is no RLock, only a :class:`Lock`.
 
 .. _RLock: http://docs.python.org/library/threading.html#rlock-objects
+
+Has Toro anything to do with Tulip?
+-----------------------------------
+
+Toro predates Tulip_, which has very similar ideas about coordinating async
+coroutines using locks and queues. Toro's author implemented Tulip's queues,
+and version 0.5 of Toro strives to match Tulip's API.
+
+The chief differences between Toro and Tulip are that Toro uses ``yield``
+instead of ``yield from``, and that Toro uses absolute deadlines instead of
+relative timeouts. Additionally, Toro's :class:`~toro.Lock` and
+:class:`~toro.Semaphore` aren't context managers (they can't be used with a
+``with`` statement); instead, the Futures returned from
+:meth:`Lock.acquire` and :meth:`Semaphore.acquire` are context
+managers:
+
+    >>> from tornado import gen
+    >>> import toro
+    >>> lock = toro.Lock()
+    >>>
+    >>> @gen.coroutine
+    ... def f():
+    ...    with (yield lock.acquire()):
+    ...        assert lock.locked()
+    ...
+    ...    assert not lock.locked()
+
+.. _Tulip: http://code.google.com/p/tulip/

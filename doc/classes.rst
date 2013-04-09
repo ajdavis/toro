@@ -67,6 +67,8 @@ JoinableQueue
 Exceptions
 ~~~~~~~~~~
 
+.. autoclass:: Timeout
+
 .. autoclass:: NotReady
 
 .. autoclass:: AlreadySet

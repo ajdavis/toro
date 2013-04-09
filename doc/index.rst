@@ -41,7 +41,8 @@ example:
 .. doctest::
 
     >>> import toro
-    >>> from tornado import gen
+    >>> from tornado import ioloop, gen
+    >>> loop = ioloop.IOLoop.current()
     >>> condition = toro.Condition()
     >>> @gen.coroutine
     ... def waiter():
@@ -58,27 +59,30 @@ example:
     >>> @gen.coroutine
     ... def runner():
     ...     # Yield two Futures; wait for waiter() and notifier() to finish
-    ...     yield waiter(), notifier()
+    ...     yield [waiter(), notifier()]
+    ...     loop.stop()
     ...
-    >>> runner()
+    >>> future = runner(); loop.start()
     I'll wait right here
     About to notify
-    I'm done waiting
     Done notifying
+    I'm done waiting
 
-Wait-methods take an optional ``deadline`` argument, which is either a Unix
-timestamp (seconds since epoch)::
+Wait-methods take an optional ``deadline`` argument, which is either an
+absolute timestamp::
+
+    loop = ioloop.IOLoop.current()
 
     # Wait up to 1 second for a notification
-    yield condition.wait(deadline=time.time() + 1)
+    yield condition.wait(deadline=loop.time() + 1)
 
 ...or a ``datetime.timedelta`` for a deadline relative to the current time::
 
     # Wait up to 1 second
     yield condition.wait(deadline=datetime.timedelta(seconds=1))
 
-If there's no notification before the deadline, the Toro-specific :exc:`Timeout`
-exception is raised.
+If there's no notification before the deadline, the Toro-specific
+:class:`Timeout` exception is raised.
 
 .. _the-get-put-pattern:
 

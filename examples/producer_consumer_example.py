@@ -1,6 +1,4 @@
 """A classic producer-consumer example for using :class:`~toro.JoinableQueue`.
-
-(Inspired by `Gevent's example <http://www.gevent.org/gevent.queue.html>`_.)
 """
 
 # start-file
@@ -24,15 +22,15 @@ def consumer():
         q.task_done()
 
 
-producer()
-consumer()
-loop = ioloop.IOLoop.current()
+if __name__ == '__main__':
+    producer()
+    consumer()
+    loop = ioloop.IOLoop.current()
 
+    def stop(future):
+        loop.stop()
+        future.result()  # Raise error if there is one
 
-def stop(future):
-    loop.stop()
-    future.result()  # Raise error if there is one
-
-# block until all tasks are done
-q.join().add_done_callback(stop)
-loop.start()
+    # block until all tasks are done
+    q.join().add_done_callback(stop)
+    loop.start()
