@@ -9,7 +9,7 @@ import time
 from tornado.testing import gen_test, AsyncTestCase
 
 import toro
-from test import make_callback
+from test import make_callback, assert_raises
 
 
 class TestAsyncResult(AsyncTestCase):
@@ -30,7 +30,7 @@ class TestAsyncResult(AsyncTestCase):
     @gen_test
     def test_raises_after_timeout(self):
         start = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             async_result = toro.AsyncResult(self.io_loop)
             yield async_result.get(deadline=timedelta(seconds=.01))
 
@@ -82,7 +82,7 @@ class TestAsyncResult(AsyncTestCase):
     def test_get_timeout(self):
         result = toro.AsyncResult(io_loop=self.io_loop)
         start = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield result.get(deadline=timedelta(seconds=.01))
 
         duration = time.time() - start

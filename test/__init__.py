@@ -1,3 +1,4 @@
+import contextlib
 from datetime import timedelta
 from functools import partial
 
@@ -11,11 +12,22 @@ import toro
 gen_test.__test__ = False  # hide from Nose
 
 
+@contextlib.contextmanager
+def assert_raises(exc_class):
+    """Roughly a backport of Python 2.7's TestCase.assertRaises"""
+    try:
+        yield
+    except exc_class:
+        pass
+    else:
+        assert False, "%s not raised" % exc_class
+
+
 def make_callback(key, history):
     def callback(future):
         exc = future.exception()
         if exc:
-            history.append(exc)
+            history.append(exc.__class__.__name__)
         else:
             history.append(key)
     return callback
@@ -45,7 +57,7 @@ class ContextManagerTestsMixin(object):
     @gen_test
     def test_context_manager_exception(self):
         toro_obj = self.toro_class()
-        with self.assertRaises(ZeroDivisionError):
+        with assert_raises(ZeroDivisionError):
             with (yield toro_obj.acquire()):
                 1 / 0
 
@@ -78,6 +90,6 @@ class ContextManagerTestsMixin(object):
 
         # Ensure we catch a "with toro_obj", which should be
         # "with (yield toro_obj)"
-        with self.assertRaises(RuntimeError):
+        with assert_raises(RuntimeError):
             with toro_obj:
                 pass

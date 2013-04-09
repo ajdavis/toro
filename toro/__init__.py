@@ -52,13 +52,13 @@ class _TimeoutFuture(Future):
         (as returned by ``time.time()``) or a ``datetime.timedelta`` object
         for a deadline relative to the current time.
 
-        set_exception(toro.Timeout) is executed after a timeout.
+        set_exception(toro.Timeout()) is executed after a timeout.
         """
 
         super(_TimeoutFuture, self).__init__()
         self.io_loop = io_loop
         if deadline is not None:
-            callback = partial(self.set_exception, Timeout)
+            callback = partial(self.set_exception, Timeout())
             self._timeout_handle = io_loop.add_timeout(deadline, callback)
         else:
             self._timeout_handle = None
@@ -102,9 +102,16 @@ class _ContextManagerFuture(Future):
         self.exit_callback = exit_callback
 
     def _done_callback(self, wrapped):
-        self.set_result(wrapped.result())
+        if wrapped.exception():
+            self.set_exception(wrapped.exception())
+        else:
+            self.set_result(wrapped.result())
 
     def result(self):
+        if self.exception():
+            raise self.exception()
+
+        # Otherwise return a context manager that cleans up after the block.
         @contextlib.contextmanager
         def f():
             try:

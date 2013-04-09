@@ -18,7 +18,7 @@ from tornado.testing import gen_test, AsyncTestCase
 
 
 import toro
-from test import make_callback, pause
+from test import make_callback, assert_raises, pause
 
 # TODO: update from tulip tests
 
@@ -56,7 +56,7 @@ class QueueTest1(AsyncTestCase):
         except Full:
             pass
 
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.put(555, deadline=timedelta(seconds=0.01))
 
         self.assertEquals(q.qsize(), QUEUE_SIZE)
@@ -70,7 +70,7 @@ class QueueTest1(AsyncTestCase):
         except Empty:
             pass
 
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.get(deadline=timedelta(seconds=0.01))
 
     simple_queue_test.__test__ = False  # Hide from nose
@@ -327,7 +327,7 @@ class TestQueueTimeouts3(AsyncTestCase):
     def test_get_timeout(self):
         q = toro.Queue()
         st = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.get(deadline=timedelta(seconds=.01))
 
         duration = time.time() - st
@@ -340,7 +340,7 @@ class TestQueueTimeouts3(AsyncTestCase):
             1, (yield q.get(deadline=timedelta(seconds=.01))))
 
         st = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.get(deadline=timedelta(seconds=.01))
 
         duration = time.time() - st
@@ -351,7 +351,7 @@ class TestQueueTimeouts3(AsyncTestCase):
         q = toro.Queue(1)
         q.put(1)
         st = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.put(2, deadline=timedelta(seconds=.01))
 
         duration = time.time() - st
@@ -363,7 +363,7 @@ class TestQueueTimeouts3(AsyncTestCase):
         yield q.put(1, deadline=timedelta(seconds=.01))
 
         st = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.put(2, deadline=timedelta(seconds=.01))
 
         duration = time.time() - st
@@ -411,7 +411,7 @@ class TestJoinableQueue3(AsyncTestCase):
         q = toro.JoinableQueue()
         q.put(1)
         st = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.join(deadline=timedelta(seconds=.01))
 
         duration = time.time() - st
@@ -446,7 +446,7 @@ class TestJoinableQueue3(AsyncTestCase):
         # Unset the event
         q.put_nowait('bar')
 
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield q.join(deadline=timedelta(seconds=0.1))
 
         q.task_done()

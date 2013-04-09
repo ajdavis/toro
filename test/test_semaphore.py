@@ -12,7 +12,7 @@ from tornado import gen
 from tornado.testing import gen_test, AsyncTestCase
 
 import toro
-from test import make_callback, ContextManagerTestsMixin
+from test import make_callback, assert_raises, ContextManagerTestsMixin
 
 
 # Adapted from Gevent's lock_tests.py
@@ -95,7 +95,7 @@ class BaseSemaphoreTests(AsyncTestCase):
 
         # The semaphore is still locked
         self.assertTrue(sem.locked())
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield sem.acquire(deadline=timedelta(seconds=0.1))
 
         # Final release, to let the last task finish
@@ -105,7 +105,7 @@ class BaseSemaphoreTests(AsyncTestCase):
         sem = self.semtype(2)
         yield sem.acquire()
         yield sem.acquire()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield sem.acquire(deadline=timedelta(seconds=0.1))
 
         sem.release()
@@ -178,9 +178,9 @@ BoundedSemaphoreTests.__test__ = True
 # Adapted from Gevent's test__semaphore.py
 class TestTimeoutAcquire(AsyncTestCase):
     @gen_test
-    def test_acquire_returns_false_after_timeout(self):
+    def test_timeout_acquire(self):
         s = toro.Semaphore(value=0)
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield s.acquire(deadline=timedelta(seconds=0.01))
 
     @gen_test

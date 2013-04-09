@@ -10,7 +10,7 @@ from tornado.testing import gen_test, AsyncTestCase
 
 
 import toro
-from test import make_callback
+from test import make_callback, assert_raises
 
 
 class TestCondition(AsyncTestCase):
@@ -71,7 +71,7 @@ class TestCondition(AsyncTestCase):
     def test_wait_timeout(self):
         c = toro.Condition(self.io_loop)
         st = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield c.wait(deadline=timedelta(seconds=.1))
 
         duration = time.time() - st
@@ -109,12 +109,12 @@ class TestCondition(AsyncTestCase):
 
         # Wait for callback 1 to time out
         yield gen.Task(self.io_loop.add_timeout, st + .2)
-        self.assertEqual([toro.Timeout], history)
+        self.assertEqual(['Timeout'], history)
 
         c.notify(2)
-        self.assertEqual([toro.Timeout, 0, 2], history)
+        self.assertEqual(['Timeout', 0, 2], history)
         c.notify()
-        self.assertEqual([toro.Timeout, 0, 2, 3], history)
+        self.assertEqual(['Timeout', 0, 2, 3], history)
 
     @gen_test
     def test_notify_all_with_timeout(self):
@@ -130,7 +130,7 @@ class TestCondition(AsyncTestCase):
 
         # Wait for callback 1 to time out
         yield gen.Task(self.io_loop.add_timeout, st + .2)
-        self.assertEqual([toro.Timeout], history)
+        self.assertEqual(['Timeout'], history)
 
         c.notify_all()
-        self.assertEqual([toro.Timeout, 0, 2], history)
+        self.assertEqual(['Timeout', 0, 2], history)

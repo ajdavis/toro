@@ -12,7 +12,7 @@ from tornado.testing import gen_test, AsyncTestCase
 
 
 import toro
-from test import make_callback, ContextManagerTestsMixin
+from test import make_callback, assert_raises, ContextManagerTestsMixin
 
 
 # Adapted from Gevent's lock_tests.py.
@@ -82,7 +82,7 @@ class LockTests2(AsyncTestCase):
         self.assertTrue(lock.locked())
         st = time.time()
 
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield lock.acquire(deadline=timedelta(seconds=.01))
 
         duration = time.time() - st

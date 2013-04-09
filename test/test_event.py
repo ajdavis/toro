@@ -11,6 +11,7 @@ from tornado import gen
 from tornado.testing import gen_test, AsyncTestCase
 
 import toro
+from test import assert_raises
 
 
 class TestEvent(AsyncTestCase):
@@ -48,7 +49,7 @@ class TestEvent(AsyncTestCase):
     def test_event_timeout(self):
         e = toro.Event()
         st = time.time()
-        with self.assertRaises(toro.Timeout):
+        with assert_raises(toro.Timeout):
             yield e.wait(deadline=timedelta(seconds=.01))
 
         duration = time.time() - st
