@@ -50,18 +50,17 @@ class TestEvent(AsyncTestCase):
         e = toro.Event()
         st = time.time()
         with assert_raises(toro.Timeout):
-            yield e.wait(deadline=timedelta(seconds=.01))
+            yield e.wait(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
         # After a timed-out waiter, normal operation works
-        self.io_loop.add_timeout(time.time() + .01, e.set)
-
         st = time.time()
+        self.io_loop.add_timeout(st + 0.1, e.set)
         result = yield e.wait(deadline=timedelta(seconds=1))
         duration = time.time() - st
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
         self.assertEqual(None, result)
 
     @gen_test
@@ -69,8 +68,4 @@ class TestEvent(AsyncTestCase):
         e = toro.Event()
         e.set()
         self.assertEqual(True, e.is_set())
-        st = time.time()
-        result = yield e.wait(deadline=timedelta(seconds=.01))
-        duration = time.time() - st
-        self.assertAlmostEqual(0, duration, places=2)
-        self.assertEqual(None, result)
+        yield e.wait()

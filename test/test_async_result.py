@@ -32,22 +32,22 @@ class TestAsyncResult(AsyncTestCase):
         start = time.time()
         with assert_raises(toro.Timeout):
             async_result = toro.AsyncResult(self.io_loop)
-            yield async_result.get(deadline=timedelta(seconds=.01))
+            yield async_result.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - start
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
     @gen_test
     def test_set(self):
         result = toro.AsyncResult(io_loop=self.io_loop)
         self.assertFalse(result.ready())
         self.io_loop.add_timeout(
-            time.time() + .01, partial(result.set, 'hello'))
+            time.time() + 0.1, partial(result.set, 'hello'))
 
         start = time.time()
         value = yield result.get()
         duration = time.time() - start
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
         self.assertTrue(result.ready())
         self.assertEqual('hello', value)
 
@@ -57,13 +57,6 @@ class TestAsyncResult(AsyncTestCase):
 
         # Non-blocking get() works
         self.assertEqual('hello', result.get_nowait())
-
-        # Timeout ignored now
-        start = time.time()
-        value = yield result.get()
-        duration = time.time() - start
-        self.assertAlmostEqual(0, duration, places=2)
-        self.assertEqual('hello', value)
 
         # set() only allowed once
         self.assertRaises(toro.AlreadySet, result.set, 'whatever')
@@ -83,17 +76,14 @@ class TestAsyncResult(AsyncTestCase):
         result = toro.AsyncResult(io_loop=self.io_loop)
         start = time.time()
         with assert_raises(toro.Timeout):
-            yield result.get(deadline=timedelta(seconds=.01))
+            yield result.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - start
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
         self.assertFalse(result.ready())
 
         # Timed-out waiter doesn't cause error
         result.set('foo')
         self.assertTrue(result.ready())
-        start = time.time()
         value = yield result.get(deadline=timedelta(seconds=.01))
-        duration = time.time() - start
         self.assertEqual('foo', value)
-        self.assertAlmostEqual(0, duration, places=2)

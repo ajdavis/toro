@@ -328,23 +328,23 @@ class TestQueueTimeouts3(AsyncTestCase):
         q = toro.Queue()
         st = time.time()
         with assert_raises(toro.Timeout):
-            yield q.get(deadline=timedelta(seconds=.01))
+            yield q.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
         # Make sure that putting and getting a value returns Queue to initial
         # state
         q.put(1)
         self.assertEqual(
-            1, (yield q.get(deadline=timedelta(seconds=.01))))
+            1, (yield q.get(deadline=timedelta(seconds=0.1))))
 
         st = time.time()
         with assert_raises(toro.Timeout):
-            yield q.get(deadline=timedelta(seconds=.01))
+            yield q.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
     @gen_test
     def test_put_timeout(self):
@@ -352,22 +352,22 @@ class TestQueueTimeouts3(AsyncTestCase):
         q.put(1)
         st = time.time()
         with assert_raises(toro.Timeout):
-            yield q.put(2, deadline=timedelta(seconds=.01))
+            yield q.put(2, deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
         # Make sure that getting and putting a value returns Queue to initial
         # state
         self.assertEqual(1, (yield q.get()))
-        yield q.put(1, deadline=timedelta(seconds=.01))
+        yield q.put(1, deadline=timedelta(seconds=0.1))
 
         st = time.time()
         with assert_raises(toro.Timeout):
-            yield q.put(2, deadline=timedelta(seconds=.01))
+            yield q.put(2, deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
 
 class TestJoinableQueue3(AsyncTestCase):
@@ -412,10 +412,10 @@ class TestJoinableQueue3(AsyncTestCase):
         q.put(1)
         st = time.time()
         with assert_raises(toro.Timeout):
-            yield q.join(deadline=timedelta(seconds=.01))
+            yield q.join(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(.01, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
         self.assertEqual(1, q.unfinished_tasks)
 
     def test_io_loop(self):

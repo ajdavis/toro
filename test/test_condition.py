@@ -24,7 +24,7 @@ class TestCondition(AsyncTestCase):
     @gen_test
     def test_notify(self):
         c = toro.Condition(self.io_loop)
-        self.io_loop.add_timeout(time.time() + .1, c.notify)
+        self.io_loop.add_timeout(time.time() + 0.1, c.notify)
         yield c.wait()
 
     def test_notify_1(self):
@@ -72,10 +72,10 @@ class TestCondition(AsyncTestCase):
         c = toro.Condition(self.io_loop)
         st = time.time()
         with assert_raises(toro.Timeout):
-            yield c.wait(deadline=timedelta(seconds=.1))
+            yield c.wait(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
     @gen_test
     def test_wait_timeout_preempted(self):
@@ -84,11 +84,11 @@ class TestCondition(AsyncTestCase):
 
         # This fires before the wait times out
         self.io_loop.add_timeout(st + .1, c.notify)
-        yield c.wait(deadline=timedelta(seconds=.2))
+        yield c.wait(deadline=timedelta(seconds=0.2))
         duration = time.time() - st
 
         # Verify we were awakened by c.notify(), not by timeout
-        self.assertAlmostEqual(.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=2)
 
     @gen_test
     def test_notify_n_with_timeout(self):
@@ -108,7 +108,7 @@ class TestCondition(AsyncTestCase):
         c.wait().add_done_callback(make_callback(3, history))
 
         # Wait for callback 1 to time out
-        yield gen.Task(self.io_loop.add_timeout, st + .2)
+        yield gen.Task(self.io_loop.add_timeout, st + 0.2)
         self.assertEqual(['Timeout'], history)
 
         c.notify(2)
@@ -129,7 +129,7 @@ class TestCondition(AsyncTestCase):
         c.wait().add_done_callback(make_callback(2, history))
 
         # Wait for callback 1 to time out
-        yield gen.Task(self.io_loop.add_timeout, st + .2)
+        yield gen.Task(self.io_loop.add_timeout, st + 0.2)
         self.assertEqual(['Timeout'], history)
 
         c.notify_all()

@@ -131,7 +131,7 @@ class BaseSemaphoreTests(AsyncTestCase):
         future = f()
 
         # Let f run
-        yield gen.Task(self.io_loop.add_timeout, time.time() + .01)
+        yield gen.Task(self.io_loop.add_timeout, time.time() + 0.01)
         self.assertFalse(f_finished[0])
         sem.release()
         yield future
@@ -191,7 +191,7 @@ class TestTimeoutAcquire(AsyncTestCase):
         s.release()
         s.acquire().add_done_callback(lambda x: result.append('b'))
         s.release()
-        yield gen.Task(self.io_loop.add_timeout, time.time() + .01)
+        yield gen.Task(self.io_loop.add_timeout, time.time() + 0.01)
         self.assertEqual(result, ['a', 'b'])
 
 
