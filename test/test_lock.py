@@ -86,7 +86,7 @@ class LockTests2(AsyncTestCase):
             yield lock.acquire(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
         self.assertTrue(lock.locked())
 
     @gen_test

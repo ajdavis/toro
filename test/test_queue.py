@@ -331,7 +331,7 @@ class TestQueueTimeouts3(AsyncTestCase):
             yield q.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
 
         # Make sure that putting and getting a value returns Queue to initial
         # state
@@ -344,7 +344,7 @@ class TestQueueTimeouts3(AsyncTestCase):
             yield q.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
 
     @gen_test
     def test_put_timeout(self):
@@ -355,7 +355,7 @@ class TestQueueTimeouts3(AsyncTestCase):
             yield q.put(2, deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
 
         # Make sure that getting and putting a value returns Queue to initial
         # state
@@ -367,7 +367,7 @@ class TestQueueTimeouts3(AsyncTestCase):
             yield q.put(2, deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
 
 
 class TestJoinableQueue3(AsyncTestCase):
@@ -415,7 +415,7 @@ class TestJoinableQueue3(AsyncTestCase):
             yield q.join(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
         self.assertEqual(1, q.unfinished_tasks)
 
     def test_io_loop(self):

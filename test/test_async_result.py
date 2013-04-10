@@ -35,7 +35,7 @@ class TestAsyncResult(AsyncTestCase):
             yield async_result.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - start
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
 
     @gen_test
     def test_set(self):
@@ -47,7 +47,7 @@ class TestAsyncResult(AsyncTestCase):
         start = time.time()
         value = yield result.get()
         duration = time.time() - start
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
         self.assertTrue(result.ready())
         self.assertEqual('hello', value)
 
@@ -79,7 +79,7 @@ class TestAsyncResult(AsyncTestCase):
             yield result.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - start
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
         self.assertFalse(result.ready())
 
         # Timed-out waiter doesn't cause error

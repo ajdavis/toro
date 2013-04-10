@@ -75,7 +75,7 @@ class TestCondition(AsyncTestCase):
             yield c.wait(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
 
     @gen_test
     def test_wait_timeout_preempted(self):
@@ -88,7 +88,7 @@ class TestCondition(AsyncTestCase):
         duration = time.time() - st
 
         # Verify we were awakened by c.notify(), not by timeout
-        self.assertAlmostEqual(0.1, duration, places=2)
+        self.assertAlmostEqual(0.1, duration, places=1)
 
     @gen_test
     def test_notify_n_with_timeout(self):
