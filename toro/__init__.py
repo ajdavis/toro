@@ -73,9 +73,6 @@ class _TimeoutFuture(Future):
         self._cancel_timeout()
         super(_TimeoutFuture, self).set_exception(exception)
 
-    def link(self, future):
-        future.add_done_callback(self._done_callback)
-
     def _done_callback(self, _):
         if not self.done():
             self.set_result(None)
@@ -310,13 +307,12 @@ class Event(object):
             (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
-        future = _TimeoutFuture(deadline, self.io_loop)
         if self._flag:
+            future = _TimeoutFuture(None, self.io_loop)
             future.set_result(None)
+            return future
         else:
-            future.link(self.condition.wait())
-
-        return future
+            return self.condition.wait(deadline)
 
 
 class Queue(object):
