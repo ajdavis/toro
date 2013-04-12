@@ -8,9 +8,6 @@ from tornado.testing import gen_test, gen
 
 import toro
 
-# TODO: remove once Tornado > 3.0 fixes this
-gen_test.__test__ = False  # hide from Nose
-
 
 @contextlib.contextmanager
 def assert_raises(exc_class):
