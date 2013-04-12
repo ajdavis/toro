@@ -51,7 +51,7 @@ class _TimeoutFuture(Future):
         """Create a Future with optional deadline.
 
         If deadline is not None, it may be a number denoting a unix timestamp
-        (as returned by ``time.time()``) or a ``datetime.timedelta`` object
+        (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` object
         for a deadline relative to the current time.
 
         set_exception(toro.Timeout()) is executed after a timeout.
@@ -228,7 +228,7 @@ class Condition(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         future = _TimeoutFuture(deadline, self.io_loop)
@@ -304,7 +304,7 @@ class Event(object):
         :Parameters:
           - `callback`: Function taking no arguments.
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         if self._flag:
@@ -418,7 +418,7 @@ class Queue(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         _consume_expired_waiters(self.getters)
@@ -466,7 +466,7 @@ class Queue(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         self._consume_expired_putters()
@@ -606,7 +606,7 @@ class JoinableQueue(Queue):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         return self._finished.wait(deadline)
@@ -696,7 +696,7 @@ class Semaphore(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         return self._unlocked.wait(deadline)
@@ -709,7 +709,7 @@ class Semaphore(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         queue_future = self.q.get(deadline)
@@ -800,7 +800,7 @@ class Lock(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``time.time()``) or a ``datetime.timedelta`` for a
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
         return self._block.acquire(deadline)
