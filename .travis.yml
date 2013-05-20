@@ -9,7 +9,7 @@ python:
 # Futures were introduced in Python 3.2 in the `concurrent.futures` package.
 # This package has also been backported to older versions of Python and can be
 # installed with `pip install futures`. Tornado uses concurrent.futures if
-# available; otherwise it will use a compatible class defined in this
+# available; otherwise it will use a compatible class defined in
 # tornado.concurrent. We want to test all cases: with and without the 'futures'
 # package installed in Python < 3.2, as well as Python >= 3.2.
 
