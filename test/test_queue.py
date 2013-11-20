@@ -227,11 +227,14 @@ class TestQueue2(AsyncTestCase):
             raise gen.Return(len(results))
 
         yield q.put(sendings[0])
+        yield pause(timedelta(seconds=.01))
         self.assertEquals((yield collect_pending_results()), 1)
         yield q.put(sendings[1])
+        yield pause(timedelta(seconds=.01))
         self.assertEquals((yield collect_pending_results()), 2)
         yield q.put(sendings[2])
         yield q.put(sendings[3])
+        yield pause(timedelta(seconds=.01))
         self.assertEquals((yield collect_pending_results()), 4)
 
     @gen_test
