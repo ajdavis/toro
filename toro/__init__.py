@@ -235,7 +235,7 @@ class Condition(object):
         self.waiters.append(future)
         return future
 
-    def notify(self, n=1):
+    def notify(self, n=1, result=None):
         """Wake up `n` waiters.
 
         :Parameters:
@@ -249,11 +249,14 @@ class Condition(object):
                 waiters.append(waiter)
 
         for waiter in waiters:
-            waiter.set_result(None)
+            waiter.set_result(result)
 
-    def notify_all(self):
+    def notify_all(self, result=None):
         """Wake up all waiters."""
-        self.notify(len(self.waiters))
+        self.notify(len(self.waiters), result=result)
+
+    def remove_waiter(self, waiter):
+        self.waiters.remove(waiter)
 
 
 # TODO: show correct examples that avoid thread / process issues w/ concurrent.futures.Future
