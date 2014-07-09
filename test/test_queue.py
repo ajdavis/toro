@@ -324,6 +324,20 @@ class TestQueue3(AsyncTestCase):
         q.put('foo')
         custom_loop.start()
 
+    @gen_test
+    def test_float_maxsize(self):
+        # Adapted from asyncio's test_float_maxsize.
+        q = toro.Queue(maxsize=1.3, io_loop=self.io_loop)
+        q.put_nowait(1)
+        q.put_nowait(2)
+        self.assertTrue(q.full())
+        self.assertRaises(Full, q.put_nowait, 3)
+
+        q = toro.Queue(maxsize=1.3, io_loop=self.io_loop)
+        yield q.put(1)
+        yield q.put(2)
+        self.assertTrue(q.full())
+
 
 class TestQueueTimeouts3(AsyncTestCase):
     @gen_test
