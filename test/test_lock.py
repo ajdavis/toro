@@ -40,6 +40,7 @@ class LockTests(AsyncTestCase):
         lock.release()
         yield futures
 
+    @gen_test
     def test_reacquire(self):
         # Lock needs to be released before re-acquiring.
         lock = toro.Lock()

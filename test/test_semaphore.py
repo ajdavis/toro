@@ -101,6 +101,7 @@ class BaseSemaphoreTests(AsyncTestCase):
         # Final release, to let the last task finish
         sem.release()
 
+    @gen_test
     def test_try_acquire(self):
         sem = self.semtype(2)
         yield sem.acquire()
