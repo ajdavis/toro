@@ -26,9 +26,11 @@ Added support for Tornado 3's Futures_:
   - All Toro methods that took *optional* callbacks have been split into two
     methods: one that returns a Future, and a "nowait" method that returns
     immediately or raises an exception.
+
      - :meth:`AsyncResult.get_nowait` can raise :exc:`NotReady`
      - :meth:`Queue.get_nowait` can raise :exc:`Empty`
      - :meth:`Queue.put_nowait` can raise :exc:`Full`
+
   - All Toro methods that return Futures accept an optional ``deadline``
     parameter. Whereas before each Toro class had different behavior after a
     timeout, all now return a Future that raises :exc:`toro.Timeout` after the
@@ -36,6 +38,7 @@ Added support for Tornado 3's Futures_:
 
 Toro's API aims to be very similar to Tulip_, since Tulip will evolve into the
 Python 3.4 standard library:
+
   - Toro's API has been updated to closely match the locks and queues in
     Tulip.
   - The requirement has been dropped that a coroutine that calls
