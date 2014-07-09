@@ -35,7 +35,7 @@ if "nosetests" in sys.argv:
     packages.append('test')
 
 setup(name='toro',
-      version='0.5',
+      version='0.6',
       packages=packages,
       description=description,
       long_description=long_description,
