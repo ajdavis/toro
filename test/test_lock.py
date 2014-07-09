@@ -62,7 +62,6 @@ class LockTests(AsyncTestCase):
 
         self.assertEqual(len(phase), 1)
         lock.release()
-        self.assertFalse(lock.locked())
         yield future
         self.assertEqual(len(phase), 2)
 
