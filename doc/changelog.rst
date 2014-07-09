@@ -3,6 +3,16 @@ Changelog
 
 .. module:: toro
 
+Changes in Version 0.6
+----------------------
+
+:class:`~toro.Queue` now supports floating-point numbers for ``maxsize``. A
+``maxsize`` of 1.3 is now equivalent to a ``maxsize`` of 2. Before, it had
+been treated as infinite.
+
+This feature is not intended to be useful, but to maintain an API similar to
+``asyncio`` and the standard library Queue.
+
 Changes in Version 0.5
 ----------------------
 
