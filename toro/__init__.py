@@ -19,7 +19,7 @@ __all__ = [
     'NotReady', 'AlreadySet', 'Full', 'Empty', 'Timeout',
 
     # Primitives
-    'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
+    'AsyncResult', 'Event', 'Condition', 'Semaphore', 'BoundedSemaphore',
     'Lock',
 
     # Queues
@@ -712,6 +712,8 @@ class Semaphore(object):
             (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
             deadline relative to the current time.
         """
+        if self.q.qsize() == 1:
+            self._unlocked.clear()
         queue_future = self.q.get(deadline)
         future = _ContextManagerFuture(queue_future, self.release)
         return future
