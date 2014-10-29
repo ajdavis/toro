@@ -713,6 +713,8 @@ class Semaphore(object):
             deadline relative to the current time.
         """
         queue_future = self.q.get(deadline)
+        if self.q.empty():
+            self._unlocked.clear()
         future = _ContextManagerFuture(queue_future, self.release)
         return future
 
