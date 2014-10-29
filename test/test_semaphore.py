@@ -137,6 +137,14 @@ class BaseSemaphoreTests(AsyncTestCase):
         sem.release()
         yield future
 
+    @gen_test
+    def test_wait(self):
+        sem = self.semtype()
+        sem.acquire()
+        with assert_raises(toro.Timeout):
+            yield sem.wait(deadline=timedelta(seconds=0.1))
+        sem.release()
+
 
 # Not a test - called from SemaphoreTests and BoundedSemaphoreTests
 BaseSemaphoreTests.__test__ = False
