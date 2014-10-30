@@ -3,6 +3,32 @@ Changelog
 
 .. module:: toro
 
+Changes in Version 0.7
+----------------------
+
+Bug fix in :class:`~toro.Semaphore`: after a call to
+:meth:`~toro.Semaphore.acquire`, :meth:`~toro.Semaphore.wait` should block
+until another coroutine calls :meth:`~toro.Semaphore.release`::
+
+    @gen.coroutine
+    def coro():
+        sem = toro.Semaphore(1)
+        assert not sem.locked()
+
+        # A semaphore with initial value of 1 can be acquired once,
+        # then it's locked.
+        sem.acquire()
+        assert sem.locked()
+
+        # Wait for another coroutine to release the semaphore.
+        yield sem.wait()
+
+However, there was a bug and :meth:`~toro.Semaphore.wait` returned immediately
+if the semaphore had **ever** been unlocked. I'm grateful to
+`"abing" <https://github.com/DanielBlack>`_ on GitHub for noticing the bug and
+contributing a fix.
+
+
 Changes in Version 0.6
 ----------------------
 
