@@ -315,6 +315,7 @@ class TestQueue3(AsyncTestCase):
         def callback(future):
             assert future.result() == 'foo'
             custom_loop.stop()
+            custom_loop.close(all_fds=True)
 
         q.get().add_done_callback(callback)
         q.put('foo')
@@ -440,6 +441,7 @@ class TestJoinableQueue3(AsyncTestCase):
         def callback(future):
             assert future.result() == 'foo'
             custom_loop.stop()
+            custom_loop.close(all_fds=True)
 
         q.get().add_done_callback(callback)
         q.put('foo')
