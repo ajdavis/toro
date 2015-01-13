@@ -1,6 +1,12 @@
 from setuptools import setup
 import sys
 
+try:
+    # Work around bug in Python 2.6, TypeError on shutdown.
+    import multiprocessing
+except ImportError:
+    pass
+
 classifiers = """\
 Intended Audience :: Developers
 License :: OSI Approved :: Apache Software License
