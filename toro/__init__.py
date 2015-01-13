@@ -924,9 +924,9 @@ class RWLock(object):
         raise gen.Return(_ContextManagerList(managers))
 
     def release_read(self):
-        """Unlock.
+        """releases one reader.
 
-        If any coroutines are waiting for :meth:`acquire_read`,
+        If any coroutines are waiting for :meth:`acquire_read` (in case of full readers queue),
         the first in line is awakened.
 
         If not locked, raise a RuntimeError.
@@ -936,10 +936,9 @@ class RWLock(object):
         self._block.release()
 
     def release_write(self):
-        """Unlock.
+        """releases after write.
 
-        If any coroutines are waiting for :meth:`acquire_write`,
-        the first in line is awakened.
+        The first in queue will be awakened after release.
 
         If not locked, raise a RuntimeError.
         """

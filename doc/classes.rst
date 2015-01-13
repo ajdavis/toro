@@ -23,7 +23,7 @@ Lock
 
 RWLock
 ----
-.. autoclass:: Lock
+.. autoclass:: RWLock
   :members:
 
 Semaphore
