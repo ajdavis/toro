@@ -1,4 +1,12 @@
-from setuptools import setup
+# Don't force people to install setuptools unless
+# we have to.
+try:
+    from setuptools import setup
+except ImportError:
+    from ez_setup import use_setuptools
+    use_setuptools()
+    from setuptools import setup
+
 import sys
 
 try:
