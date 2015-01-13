@@ -42,14 +42,14 @@ class QueueTest1(AsyncTestCase):
                             LifoQueue=[222, 333, 111],
                             PriorityQueue=[111, 222, 333])
         actual_order = [q.get_nowait(), q.get_nowait(), q.get_nowait()]
-        self.assertEquals(actual_order, target_order[q.__class__.__name__],
-                          "Didn't seem to queue the correct data!")
+        self.assertEqual(actual_order, target_order[q.__class__.__name__],
+                         "Didn't seem to queue the correct data!")
         for i in range(QUEUE_SIZE-1):
             q.put_nowait(i)
-            self.assert_(not q.empty(), "Queue should not be empty")
-        self.assert_(not q.full(), "Queue should not be full")
+            self.assertTrue(not q.empty(), "Queue should not be empty")
+        self.assertTrue(not q.full(), "Queue should not be full")
         q.put_nowait(444)
-        self.assert_(q.full(), "Queue should be full")
+        self.assertTrue(q.full(), "Queue should be full")
         try:
             q.put_nowait(555)
             self.fail("Didn't appear to block with a full queue")
@@ -59,11 +59,11 @@ class QueueTest1(AsyncTestCase):
         with assert_raises(toro.Timeout):
             yield q.put(555, deadline=timedelta(seconds=0.01))
 
-        self.assertEquals(q.qsize(), QUEUE_SIZE)
+        self.assertEqual(q.qsize(), QUEUE_SIZE)
         # Empty it
         for i in range(QUEUE_SIZE):
             q.get_nowait()
-        self.assert_(q.empty(), "Queue should be empty")
+        self.assertTrue(q.empty(), "Queue should be empty")
         try:
             q.get_nowait()
             self.fail("Didn't appear to block with an empty queue")
@@ -124,8 +124,8 @@ class TestJoinableQueue1(AsyncTestCase):
         for i in xrange(100):
             q.put(i)
         yield q.join()
-        self.assertEquals(self.cum, sum(range(100)),
-                          "q.join() did not block until all tasks were done")
+        self.assertEqual(self.cum, sum(range(100)),
+                         "q.join() did not block until all tasks were done")
         for i in (0,1):
             q.put(None)         # instruct the tasks to end
         yield q.join()          # verify that you can join twice
@@ -190,12 +190,12 @@ class TestQueue2(AsyncTestCase):
 
         future = putter()
         yield pause(timedelta(seconds=.01))
-        self.assertEquals(results, ['a', 'b'])
-        self.assertEquals((yield q.get()), 'a')
+        self.assertEqual(results, ['a', 'b'])
+        self.assertEqual((yield q.get()), 'a')
         yield pause(timedelta(seconds=.01))
-        self.assertEquals(results, ['a', 'b', 'c'])
-        self.assertEquals((yield q.get()), 'b')
-        self.assertEquals((yield q.get()), 'c')
+        self.assertEqual(results, ['a', 'b', 'c'])
+        self.assertEqual((yield q.get()), 'b')
+        self.assertEqual((yield q.get()), 'c')
         yield future
 
     @gen_test
@@ -224,14 +224,14 @@ class TestQueue2(AsyncTestCase):
 
         yield q.put(sendings[0])
         yield pause(timedelta(seconds=.01))
-        self.assertEquals((yield collect_pending_results()), 1)
+        self.assertEqual((yield collect_pending_results()), 1)
         yield q.put(sendings[1])
         yield pause(timedelta(seconds=.01))
-        self.assertEquals((yield collect_pending_results()), 2)
+        self.assertEqual((yield collect_pending_results()), 2)
         yield q.put(sendings[2])
         yield q.put(sendings[3])
         yield pause(timedelta(seconds=.01))
-        self.assertEquals((yield collect_pending_results()), 4)
+        self.assertEqual((yield collect_pending_results()), 4)
 
     @gen_test
     def test_senders_that_die(self):
@@ -242,7 +242,7 @@ class TestQueue2(AsyncTestCase):
             yield q.put('sent')
 
         future = do_send(q)
-        self.assertEquals((yield q.get()), 'sent')
+        self.assertEqual((yield q.get()), 'sent')
         yield future
 
 
