@@ -31,7 +31,7 @@ if major >= 3:
     kwargs['use_2to3'] = True
 
 packages = ['toro']
-if "nosetests" in sys.argv:
+if "test" in sys.argv:
     packages.append('test')
 
 setup(name='toro',
@@ -46,7 +46,6 @@ setup(name='toro',
       license='http://www.apache.org/licenses/LICENSE-2.0',
       classifiers=filter(None, classifiers.split('\n')),
       keywords='tornado coroutines semaphore mutex queue asynchronous',
-      # use python setup.py nosetests to test
-      setup_requires=['nose'],
+      test_suite='test',
       **kwargs
 )

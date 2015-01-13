@@ -78,6 +78,6 @@ documentation. Documentation can be generated like:
 Testing
 =======
 
-Run ``python setup.py nosetests`` in the root directory.
+Run ``python setup.py test`` in the root directory.
 
 Toro boasts 100% code coverage, including branch-coverage!

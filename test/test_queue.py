@@ -73,8 +73,6 @@ class QueueTest1(AsyncTestCase):
         with assert_raises(toro.Timeout):
             yield q.get(deadline=timedelta(seconds=0.01))
 
-    simple_queue_test.__test__ = False  # Hide from nose
-
     @gen_test
     def test_simple_queue(self):
         # Do it a couple of times on the same queue.
@@ -131,8 +129,6 @@ class TestJoinableQueue1(AsyncTestCase):
         for i in (0,1):
             q.put(None)         # instruct the tasks to end
         yield q.join()          # verify that you can join twice
-
-    queue_join_test.__test__ = False # It's a utility, hide it from nosetests
 
     @gen_test
     def test_queue_join(self):

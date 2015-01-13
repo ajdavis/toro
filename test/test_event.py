@@ -24,7 +24,7 @@ class TestEvent(AsyncTestCase):
         self.assertTrue('set' in str(event))
 
     @gen.coroutine
-    def test_event(self, n):
+    def _test_event(self, n):
         e = toro.Event()
         futures = []
         for i in range(n):
@@ -34,16 +34,13 @@ class TestEvent(AsyncTestCase):
         e.clear()
         yield futures
 
-    # Not a test - called from test_event_1, etc.
-    test_event.__test__ = False
-
     @gen_test
     def test_event_1(self):
-        yield self.test_event(1)
+        yield self._test_event(1)
 
     @gen_test
     def test_event_100(self):
-        yield self.test_event(100)
+        yield self._test_event(100)
 
     @gen_test
     def test_event_timeout(self):

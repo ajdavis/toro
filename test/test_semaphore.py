@@ -16,7 +16,7 @@ from test import make_callback, assert_raises, ContextManagerTestsMixin
 
 
 # Adapted from Gevent's lock_tests.py
-class BaseSemaphoreTests(AsyncTestCase):
+class BaseSemaphoreTests(object):
     semtype = None
 
     def test_constructor(self):
@@ -146,11 +146,7 @@ class BaseSemaphoreTests(AsyncTestCase):
         sem.release()
 
 
-# Not a test - called from SemaphoreTests and BoundedSemaphoreTests
-BaseSemaphoreTests.__test__ = False
-
-
-class SemaphoreTests(BaseSemaphoreTests):
+class SemaphoreTests(BaseSemaphoreTests, AsyncTestCase):
     """
     Tests for unbounded semaphores.
     """
@@ -164,10 +160,8 @@ class SemaphoreTests(BaseSemaphoreTests):
         sem.acquire()
         sem.release()
 
-SemaphoreTests.__test__ = True
 
-
-class BoundedSemaphoreTests(BaseSemaphoreTests):
+class BoundedSemaphoreTests(BaseSemaphoreTests, AsyncTestCase):
     """
     Tests for bounded semaphores.
     """
