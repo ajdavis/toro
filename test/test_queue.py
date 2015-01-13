@@ -335,6 +335,22 @@ class TestQueue3(AsyncTestCase):
         yield q.put(2)
         self.assertTrue(q.full())
 
+    @gen_test
+    def test_get_nowait_unblocks_putter(self):
+        q = toro.Queue(maxsize=1)
+        q.put_nowait(1)
+        future = q.put(2, deadline=timedelta(seconds=1))
+        self.assertEqual(1, q.get_nowait())
+        yield future
+
+    @gen_test
+    def test_put_nowait_unblocks_getter(self):
+        q = toro.Queue(maxsize=1)
+        future = q.get(deadline=timedelta(seconds=1))
+        q.put_nowait(1)
+        result = yield future
+        self.assertEqual(1, result)
+
 
 class TestQueueTimeouts3(AsyncTestCase):
     @gen_test
