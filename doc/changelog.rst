@@ -3,6 +3,13 @@ Changelog
 
 .. module:: toro
 
+Changes in Version 0.8
+----------------------
+
+Don't depend on "nose" for tests. Improve test quality and coverage.
+Delete unused method in internal ``_TimeoutFuture`` class.
+
+
 Changes in Version 0.7
 ----------------------
 
