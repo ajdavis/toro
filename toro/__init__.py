@@ -73,10 +73,6 @@ class _TimeoutFuture(Future):
         self._cancel_timeout()
         super(_TimeoutFuture, self).set_exception(exception)
 
-    def _done_callback(self, _):
-        if not self.done():
-            self.set_result(None)
-
     def _cancel_timeout(self):
         if self._timeout_handle:
             self.io_loop.remove_timeout(self._timeout_handle)
