@@ -5,6 +5,7 @@ from functools import partial
 from Queue import Full, Empty
 
 from tornado import ioloop
+from tornado import gen
 from tornado.concurrent import Future
 
 
@@ -82,6 +83,14 @@ class _TimeoutFuture(Future):
             self.io_loop.remove_timeout(self._timeout_handle)
             self._timeout_handle = None
 
+class _ContextManagerList(list):
+    def __enter__(self, *args, **kwargs):
+        for obj in self:
+            obj.__enter__(*args, **kwargs)
+
+    def __exit__(self, *args, **kwargs):
+        for obj in self:
+            obj.__exit__(*args, **kwargs)
 
 class _ContextManagerFuture(Future):
     """A Future that can be used with the "with" statement.
@@ -818,6 +827,126 @@ class Lock(object):
         if not self.locked():
             raise RuntimeError('release unlocked lock')
         self._block.release()
+
+    def locked(self):
+        """``True`` if the lock has been acquired"""
+        return self._block.locked()
+
+    def __enter__(self):
+        raise RuntimeError(
+            "Use Lock like 'with (yield lock)', not like"
+            " 'with lock'")
+
+    __exit__ = __enter__
+
+
+class RWLock(object):
+    """A read-write lock for coroutines.
+
+    It is created unlocked. When unlocked, :meth:`acquire_write` always changes the state
+    to locked. When unlocked, :meth:`acquire_read` can changes the state
+    to locked, if :meth:`acquire_read` was called max_readers times. When the state is locked, 
+    yielding :meth:`acquire_read` or meth:`acquire_write` waits until a call to :meth:`release_write`
+    in case of locking on write, or :meth:`release_read` in case of locking on read.
+
+    The :meth:`release_read` method should only be called in the locked on read state;
+    an attempt to release an unlocked lock raises RuntimeError.
+
+    The :meth:`release_write` method should only be called in the locked on write state;
+    an attempt to release an unlocked lock raises RuntimeError.
+
+    When more than one coroutine is waiting for the lock, the first one
+    registered is awakened by :meth:`release_read`/:meth:`release_write`.
+
+    :meth:`acquire_read`/:meth:`acquire_write` support the context manager protocol:
+
+    >>> from tornado import gen
+    >>> import toro
+    >>> lock = toro.RWLock(max_readers=10)
+    >>>
+    >>> @gen.coroutine
+    ... def f():
+    ...    with (yield lock.acquire_read()):
+    ...        assert not lock.locked()
+    ...
+    ...    with (yield lock.acquire_write()):
+    ...        assert lock.locked()
+    ...
+    ...    assert not lock.locked()
+
+    .. note:: Unlike with the standard threading.Lock_, code in a
+      single-threaded Tornado application can check if a :class:`Lock`
+      is :meth:`locked`, and act on that information without fear that another
+      thread has grabbed the lock, provided you do not yield to the IOLoop
+      between checking :meth:`locked` and using a protected resource.
+
+    .. _threading.Lock: http://docs.python.org/2/library/threading.html#lock-objects
+
+    .. seealso:: :doc:`examples/lock_example`
+
+    :Parameters:
+      - `max_readers`: Optional max readers value.
+      - `io_loop`: Optional custom IOLoop.
+    """
+    def __init__(self, max_readers=1, io_loop=None):
+        self._max_readers = max_readers
+        self._block = BoundedSemaphore(value=max_readers, io_loop=io_loop)
+
+    def __str__(self):
+        return "<%s _block=%s>" % (
+            self.__class__.__name__,
+            self._block)
+
+    def acquire_read(self, deadline=None):
+        """Attempt to lock for read. Returns a Future.
+
+        The Future raises :exc:`toro.Timeout` if the deadline passes.
+
+        :Parameters:
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
+            deadline relative to the current time.
+        """
+        return self._block.acquire(deadline)
+
+    @gen.coroutine
+    def acquire_write(self, deadline=None):
+        """Attempt to lock for write. Returns a Future.
+
+        The Future raises :exc:`toro.Timeout` if the deadline passes.
+
+        :Parameters:
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
+            deadline relative to the current time.
+        """
+        managers = yield [self._block.acquire(deadline) for i in xrange(self._max_readers)]
+        raise gen.Return(_ContextManagerList(managers))
+
+    def release_read(self):
+        """Unlock.
+
+        If any coroutines are waiting for :meth:`acquire_read`,
+        the first in line is awakened.
+
+        If not locked, raise a RuntimeError.
+        """
+        if not self.locked():
+            raise RuntimeError('release unlocked lock')
+        self._block.release()
+
+    def release_write(self):
+        """Unlock.
+
+        If any coroutines are waiting for :meth:`acquire_write`,
+        the first in line is awakened.
+
+        If not locked, raise a RuntimeError.
+        """
+        if not self.locked():
+            raise RuntimeError('release unlocked lock')
+        for i in xrange(self._max_readers):
+            self._block.release()
 
     def locked(self):
         """``True`` if the lock has been acquired"""
