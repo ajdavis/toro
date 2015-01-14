@@ -67,6 +67,57 @@ class RWLockReadTests(AsyncTestCase):
         self.assertEqual(len(phase), 2)
 
 # Adapted from toro.test_lock.py
+class RWLockWriteTests(AsyncTestCase):
+    def test_acquire_release(self):
+        lock = toro.RWLock(max_readers=10)
+        self.assertFalse(lock.locked())
+        self.assertTrue(lock.acquire_write())
+        self.assertTrue(lock.locked())
+        lock.release_write()
+        self.assertFalse(lock.locked())
+
+    @gen_test
+    def test_acquire_contended(self):
+        lock = toro.RWLock(max_readers=10)
+        self.assertTrue(lock.acquire_write())
+        N = 5
+
+        @gen.coroutine
+        def f():
+            yield lock.acquire_write()
+            lock.release_write()
+
+        futures = [f() for _ in range(N)]
+        lock.release_write()
+        yield futures
+
+    @gen_test
+    def test_reacquire(self):
+        # Lock needs to be released before re-acquiring.
+        lock = toro.RWLock(max_readers=10)
+        phase = []
+
+        @gen.coroutine
+        def f():
+            yield lock.acquire_write()
+            self.assertTrue(lock.locked())
+            phase.append(None)
+
+            yield lock.acquire_write()
+            self.assertTrue(lock.locked())
+            phase.append(None)
+
+        future = f()
+
+        while len(phase) == 0:
+            yield gen.Task(self.io_loop.add_callback)
+
+        self.assertEqual(len(phase), 1)
+        lock.release_write()
+        yield future
+        self.assertEqual(len(phase), 2)
+
+# Adapted from toro.test_lock.py
 class RWLockReadTests2(AsyncTestCase):
     def test_str(self):
         lock = toro.RWLock(max_readers=1)
@@ -105,6 +156,47 @@ class RWLockReadTests2(AsyncTestCase):
         lock.release_read()
         self.assertRaises(RuntimeError, lock.release_read)
 
+# Adapted from toro.test_lock.py
+class RWLockWriteTests2(AsyncTestCase):
+    def test_str(self):
+        lock = toro.RWLock(max_readers=10)
+        # No errors in various states
+        str(lock)
+        lock.acquire_write()
+        str(lock)
+
+    @gen_test
+    def test_acquire_timeout(self):
+        lock = toro.RWLock(max_readers=10)
+        self.assertTrue(lock.acquire_write())
+        self.assertTrue(lock.locked())
+        st = time.time()
+
+        with assert_raises(toro.Timeout):
+            yield lock.acquire_write(deadline=timedelta(seconds=0.1))
+
+        duration = time.time() - st
+        self.assertAlmostEqual(0.1, duration, places=1)
+        self.assertTrue(lock.locked())
+
+    @gen_test
+    def test_acquire_callback(self):
+        lock = toro.RWLock(max_readers=10)
+        history = []
+        lock.acquire_write().add_done_callback(make_callback('acquire1', history))
+        future = lock.acquire_write()
+        future.add_done_callback(make_callback('acquire2', history))
+        lock.release_write()
+        yield future
+        history.append('release')
+        self.assertEqual(['acquire1', 'acquire2', 'release'], history)
+
+    def test_multi_release(self):
+        lock = toro.RWLock(max_readers=10)
+        lock.acquire_write()
+        lock.release_write()
+        self.assertRaises(RuntimeError, lock.release_read)
+
 
 class RWLockWithReadDefault(toro.RWLock):
     def acquire(self, *args, **kwargs):
@@ -139,7 +231,7 @@ class RWLockWithWriteMultipleReadersContextManagerTest(ContextManagerTestsMixin,
 
 
 # Not adapted from toro lock tests, written just for RWLock
-class RWLockReadTests3(AsyncTestCase):
+class RWLockTests3(AsyncTestCase):
     @gen_test
     def test_read_lock(self):
         MAX_READERS = randint(2,10)
