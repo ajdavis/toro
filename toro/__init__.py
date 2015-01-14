@@ -846,7 +846,7 @@ class RWLock(object):
     It is created unlocked. When unlocked, :meth:`acquire_write` always changes the state
     to locked. When unlocked, :meth:`acquire_read` can changes the state
     to locked, if :meth:`acquire_read` was called max_readers times. When the state is locked, 
-    yielding :meth:`acquire_read` or meth:`acquire_write` waits until a call to :meth:`release_write`
+    yielding :meth:`acquire_read`/meth:`acquire_write` waits until a call to :meth:`release_write`
     in case of locking on write, or :meth:`release_read` in case of locking on read.
 
     The :meth:`release_read` method should only be called in the locked on read state;
@@ -875,7 +875,7 @@ class RWLock(object):
     ...    assert not lock.locked()
 
     .. note:: Unlike with the standard threading.Lock_, code in a
-      single-threaded Tornado application can check if a :class:`Lock`
+      single-threaded Tornado application can check if a :class:`RWLock`
       is :meth:`locked`, and act on that information without fear that another
       thread has grabbed the lock, provided you do not yield to the IOLoop
       between checking :meth:`locked` and using a protected resource.
@@ -953,7 +953,7 @@ class RWLock(object):
 
     def __enter__(self):
         raise RuntimeError(
-            "Use Lock like 'with (yield lock)', not like"
+            "Use RWLock like 'with (yield lock)', not like"
             " 'with lock'")
 
     __exit__ = __enter__
