@@ -6,6 +6,8 @@ Changelog
 Changes in Next Version
 -----------------------
 
+Dropped support for Tornado 3.
+
 Changes in Version 0.8
 ----------------------
 

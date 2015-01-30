@@ -25,7 +25,7 @@ A set of locking and synchronizing primitives analogous to those in Python's
 
 Dependencies
 ============
-Tornado_ >= version 3.0.
+Tornado_ >= version 4.0.
 
 .. _Tornado: http://www.tornadoweb.org/
 
