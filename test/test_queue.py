@@ -13,6 +13,7 @@ from datetime import timedelta
 from Queue import Empty, Full
 
 from tornado import gen
+from tornado.concurrent import Future
 from tornado.ioloop import IOLoop
 from tornado.testing import gen_test, AsyncTestCase
 
@@ -205,10 +206,10 @@ class TestQueue2(AsyncTestCase):
 
         @gen.coroutine
         def waiter(q, evt):
-            evt.set((yield q.get()))
+            evt.set_result((yield q.get()))
 
         sendings = ['1', '2', '3', '4']
-        evts = [toro.AsyncResult() for x in sendings]
+        evts = [Future() for _ in sendings]
         for i, x in enumerate(sendings):
             waiter(q, evts[i]) # start task
 
@@ -216,9 +217,9 @@ class TestQueue2(AsyncTestCase):
         def collect_pending_results():
             results = set()
             for e in evts:
-                if e.ready():
+                if e.done():
                     # Won't block
-                    x = yield e.get()
+                    x = yield e
                     results.add(x)
             raise gen.Return(len(results))
 

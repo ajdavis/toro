@@ -14,27 +14,15 @@ version = '.'.join(map(str, version_tuple))
 
 
 __all__ = [
-    'NotReady', 'AlreadySet', 'Full', 'Empty', 'Timeout',
     # Exceptions. Keep exporting "Timeout" for compatibility.
+    'Full', 'Empty', 'Timeout',
 
     # Primitives
-    'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
-    'Lock',
+    'Event', 'Condition',  'Semaphore', 'BoundedSemaphore', 'Lock',
 
     # Queues
     'Queue', 'PriorityQueue', 'LifoQueue', 'JoinableQueue'
 ]
-
-
-class NotReady(Exception):
-    """Raised when accessing an :class:`AsyncResult` that has no value yet."""
-    pass
-
-
-class AlreadySet(Exception):
-    """Raised when setting a value on an :class:`AsyncResult` that already
-    has one."""
-    pass
 
 
 Timeout = gen.TimeoutError
@@ -105,76 +93,6 @@ def _consume_expired_waiters(waiters):
 
 
 _null_result = object()
-
-
-class AsyncResult(object):
-    """A one-time event that stores a value or an exception.
-
-    The only distinction between AsyncResult and a simple Future is that
-    AsyncResult lets coroutines wait with a deadline. The deadline can be
-    configured separately for each waiter.
-
-    An :class:`AsyncResult` instance cannot be reset.
-
-    :Parameters:
-      - `io_loop`: Optional custom IOLoop.
-    """
-
-    def __init__(self, io_loop=None):
-        self.io_loop = io_loop or ioloop.IOLoop.current()
-        self.value = _null_result
-        self.waiters = []
-
-    def __str__(self):
-        result = '<%s ' % (self.__class__.__name__, )
-        if self.ready():
-            result += 'value=%r' % self.value
-        else:
-            result += 'unset'
-            if self.waiters:
-                result += ' waiters[%s]' % len(self.waiters)
-
-        return result + '>'
-
-    def set(self, value):
-        """Set a value and wake up all the waiters."""
-        if self.ready():
-            raise AlreadySet
-
-        self.value = value
-        waiters, self.waiters = self.waiters, []
-        for waiter in waiters:
-            if not waiter.done():  # Might have timed out
-                waiter.set_result(value)
-
-    def ready(self):
-        return self.value is not _null_result
-
-    def get(self, deadline=None):
-        """Get a value once :meth:`set` is called. Returns a Future.
-
-        The Future's result will be the value. The Future raises
-        :exc:`~tornado.gen.TimeoutError` if no value is set before the deadline.
-
-        :Parameters:
-          - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
-            a deadline relative to the current time.
-        """
-        future = Future()
-        if self.ready():
-            future.set_result(self.value)
-            return future
-        else:
-            self.waiters.append(future)
-            return _future_with_timeout(deadline, future, self.io_loop)
-
-    def get_nowait(self):
-        """Get the value if ready, or raise :class:`NotReady`."""
-        if self.ready():
-            return self.value
-        else:
-            raise NotReady
 
 
 class Condition(object):

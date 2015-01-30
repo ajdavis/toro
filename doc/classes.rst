@@ -11,11 +11,6 @@
 Primitives
 ~~~~~~~~~~
 
-AsyncResult
------------
-.. autoclass:: AsyncResult
-  :members:
-
 Lock
 ----
 .. autoclass:: Lock
@@ -67,12 +62,8 @@ JoinableQueue
 Exceptions
 ~~~~~~~~~~
 
-.. autoclass:: NotReady
-
-.. autoclass:: AlreadySet
-
-Toro also uses exceptions Empty_ and Full_ from the standard module Queue_,
-and :exc:`tornado.gen.TimeoutError`.
+Toro uses :exc:`tornado.gen.TimeoutError`, and the exceptions Empty_ and Full_
+from the standard module Queue_.
 
 .. _Empty: http://docs.python.org/library/queue.html#Queue.Empty
 
@@ -85,7 +76,7 @@ Class relationships
 
 Toro uses some of its primitives in the implementation of others.
 For example, :class:`JoinableQueue` is a subclass of :class:`Queue`, and it
-contains an :class:`Event`. (:class:`AsyncResult` stands alone.)
+contains an :class:`Event`.
 
 .. graphviz::
 

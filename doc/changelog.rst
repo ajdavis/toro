@@ -13,6 +13,42 @@ standard :exc:`tornado.gen.TimeoutError`. For now, ``toro.Timeout`` is aliased
 to :exc:`tornado.gen.TimeoutError` for compatibility. But if your code catches
 ``toro.Timeout``, update it to catch :exc:`tornado.gen.TimeoutError`.
 
+The ``AsyncResult`` class is removed along with the exceptions it raised,
+``NotReady`` and ``AlreadySet``. It was redundant with
+:class:`tornado.concurrent.Future`. If you wrote code like this::
+
+    from tornado import gen
+    import toro
+
+
+    result = toro.AsyncResult()
+
+    @gen.coroutine
+    def setter():
+        result.set(1)
+
+    @gen.coroutine
+    def getter():
+        value = yield result.get()
+        print(value)  # Prints "1".
+
+... then you can as easily use a :class:`~tornado.concurrent.Future`::
+
+    from tornado import gen
+    from tornado.concurrent import Future
+
+
+    result = Future()
+
+    @gen.coroutine
+    def setter():
+        result.set_result(1)
+
+    @gen.coroutine
+    def getter():
+        value = yield result
+        print(value)  # Prints "1".
+
 Changes in Version 0.8
 ----------------------
 
@@ -70,7 +106,7 @@ Added support for Tornado 3's Futures_:
     methods: one that returns a Future, and a "nowait" method that returns
     immediately or raises an exception.
 
-     - :meth:`AsyncResult.get_nowait` can raise :exc:`NotReady`
+     - ``AsyncResult.get_nowait`` can raise ``NotReady``
      - :meth:`Queue.get_nowait` can raise :exc:`Empty`
      - :meth:`Queue.put_nowait` can raise :exc:`Full`
 
