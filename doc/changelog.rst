@@ -3,6 +3,9 @@ Changelog
 
 .. module:: toro
 
+Changes in Next Version
+-----------------------
+
 Changes in Version 0.8
 ----------------------
 

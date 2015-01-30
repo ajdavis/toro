@@ -8,7 +8,7 @@ from tornado import ioloop
 from tornado.concurrent import Future
 
 
-version_tuple = (0, 8)
+version_tuple = (0, 8, '+')
 
 version = '.'.join(map(str, version_tuple))
 """Current version of Toro."""
