@@ -57,14 +57,11 @@ LifoQueue
 Exceptions
 ~~~~~~~~~~
 
-Toro uses :exc:`tornado.gen.TimeoutError`, and the exceptions Empty_ and Full_
-from the standard module Queue_.
+.. autoclass:: QueueEmpty
 
-.. _Empty: http://docs.python.org/library/queue.html#Queue.Empty
+.. autoclass:: QueueFull
 
-.. _Full: http://docs.python.org/library/queue.html#Queue.Full
-
-.. _Queue: http://docs.python.org/library/queue.html
+Toro also uses :exc:`tornado.gen.TimeoutError`.
 
 Class relationships
 ~~~~~~~~~~~~~~~~~~~

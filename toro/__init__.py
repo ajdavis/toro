@@ -15,7 +15,10 @@ version = '.'.join(map(str, version_tuple))
 
 
 __all__ = [
-    # Exceptions. Keep exporting "Timeout" for compatibility.
+    # Exceptions.
+    'QueueFull', 'QueueEmpty',
+
+    # Deprecated exceptions. Keep exporting these for compatibility.
     'Full', 'Empty', 'Timeout',
 
     # Primitives.
@@ -35,6 +38,19 @@ Preserves backward-compatibility with Toro 0.7 and older, which raised a custom
 
 .. versionadded:: 0.8
 """
+
+
+# For compatibility with Toro 0.8 and older, these inherit from the standard
+# exceptions. Eventually they should just inherit from Exception, same as
+# asyncio's QueueEmpty and QueueFull do.
+class QueueEmpty(Empty):
+    """Exception raised by :meth:`Queue.get` and :meth:`Queue.get_nowait`."""
+    pass
+
+
+class QueueFull(Full):
+    """Exception raised by :meth:`Queue.put` and :meth:`Queue.put_nowait`."""
+    pass
 
 
 _null_future = Future()
@@ -342,7 +358,7 @@ class Queue(object):
     def put_nowait(self, item):
         """Put an item into the queue without blocking.
 
-        If no free slot is immediately available, raise queue.Full.
+        If no free slot is immediately available, raise :exc:`QueueFull`.
         """
         _consume_expired_waiters(self.getters)
         if self.getters:
@@ -352,7 +368,7 @@ class Queue(object):
             self._put(item)
             getter.set_result(self._get())
         elif self.maxsize and self.maxsize <= self.qsize():
-            raise Full
+            raise QueueFull
         else:
             self._put(item)
 
@@ -387,7 +403,7 @@ class Queue(object):
         """Remove and return an item from the queue without blocking.
 
         Return an item if one is immediately available, else raise
-        :exc:`queue.Empty`.
+        :exc:`QueueEmpty`.
         """
         self._consume_expired_putters()
         if self.putters:
@@ -399,7 +415,7 @@ class Queue(object):
         elif self.qsize():
             return self._get()
         else:
-            raise Empty
+            raise QueueEmpty
 
     def task_done(self):
         """Indicate that a formerly enqueued task is complete.

@@ -10,7 +10,6 @@ There are three sections, one each for tests that are
 
 import time
 from datetime import timedelta
-from Queue import Empty, Full
 import warnings
 
 from tornado import gen
@@ -55,7 +54,7 @@ class QueueTest1(AsyncTestCase):
         try:
             q.put_nowait(555)
             self.fail("Didn't appear to block with a full queue")
-        except Full:
+        except toro.QueueFull:
             pass
 
         with assert_raises(gen.TimeoutError):
@@ -69,7 +68,7 @@ class QueueTest1(AsyncTestCase):
         try:
             q.get_nowait()
             self.fail("Didn't appear to block with an empty queue")
-        except Empty:
+        except toro.QueueEmpty:
             pass
 
         with assert_raises(gen.TimeoutError):
@@ -330,7 +329,7 @@ class TestQueue3(AsyncTestCase):
         q.put_nowait(1)
         q.put_nowait(2)
         self.assertTrue(q.full())
-        self.assertRaises(Full, q.put_nowait, 3)
+        self.assertRaises(toro.QueueFull, q.put_nowait, 3)
 
         q = toro.Queue(maxsize=1.3, io_loop=self.io_loop)
         yield q.put(1)

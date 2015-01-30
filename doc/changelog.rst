@@ -57,6 +57,12 @@ with :class:`~toro.Queue`.
 .. seealso:: Tulip issue 220, `Merge JoinableQueue with Queue
    <https://code.google.com/p/tulip/issues/detail?id=220>`_.
 
+Also for consistency with asyncio, :class:`Queue` now raises Toro-specific
+exceptions :exc:`QueueEmpty` and :exc:`QueueFull` instead of the Python
+standard exceptions ``queue.Empty`` and ``queue.Full``. For compatibility,
+these new exceptions *inherit* from the standard exceptions. However, if your
+code catches the standard exceptions, update it to catch Toro's exceptions.
+
 Changes in Version 0.8
 ----------------------
 
@@ -115,8 +121,8 @@ Added support for Tornado 3's Futures_:
     immediately or raises an exception.
 
      - ``AsyncResult.get_nowait`` can raise ``NotReady``
-     - :meth:`Queue.get_nowait` can raise :exc:`Empty`
-     - :meth:`Queue.put_nowait` can raise :exc:`Full`
+     - :meth:`Queue.get_nowait` can raise ``Empty``
+     - :meth:`Queue.put_nowait` can raise ``Full``
 
   - All Toro methods that return Futures accept an optional ``deadline``
     parameter. Whereas before each Toro class had different behavior after a
