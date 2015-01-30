@@ -8,6 +8,11 @@ Changes in Next Version
 
 Dropped support for Tornado 3.
 
+Instead of raising a ``toro.Timeout`` exception, Toro's methods now raise the
+standard :exc:`tornado.gen.TimeoutError`. For now, ``toro.Timeout`` is aliased
+to :exc:`tornado.gen.TimeoutError` for compatibility. But if your code catches
+``toro.Timeout``, update it to catch :exc:`tornado.gen.TimeoutError`.
+
 Changes in Version 0.8
 ----------------------
 
@@ -71,7 +76,7 @@ Added support for Tornado 3's Futures_:
 
   - All Toro methods that return Futures accept an optional ``deadline``
     parameter. Whereas before each Toro class had different behavior after a
-    timeout, all now return a Future that raises :exc:`toro.Timeout` after the
+    timeout, all now return a Future that raises ``toro.Timeout`` after the
     deadline.
 
 Toro's API aims to be very similar to Tulip_, since Tulip will evolve into the

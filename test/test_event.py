@@ -46,7 +46,7 @@ class TestEvent(AsyncTestCase):
     def test_event_timeout(self):
         e = toro.Event()
         st = time.time()
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield e.wait(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st

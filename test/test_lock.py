@@ -82,7 +82,7 @@ class LockTests2(AsyncTestCase):
         self.assertTrue(lock.locked())
         st = time.time()
 
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield lock.acquire(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st

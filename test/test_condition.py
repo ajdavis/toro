@@ -71,7 +71,7 @@ class TestCondition(AsyncTestCase):
     def test_wait_timeout(self):
         c = toro.Condition(self.io_loop)
         st = time.time()
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield c.wait(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - st
@@ -109,12 +109,12 @@ class TestCondition(AsyncTestCase):
 
         # Wait for callback 1 to time out
         yield gen.Task(self.io_loop.add_timeout, st + 0.2)
-        self.assertEqual(['Timeout'], history)
+        self.assertEqual(['TimeoutError'], history)
 
         c.notify(2)
-        self.assertEqual(['Timeout', 0, 2], history)
+        self.assertEqual(['TimeoutError', 0, 2], history)
         c.notify()
-        self.assertEqual(['Timeout', 0, 2, 3], history)
+        self.assertEqual(['TimeoutError', 0, 2, 3], history)
 
     @gen_test
     def test_notify_all_with_timeout(self):
@@ -130,7 +130,7 @@ class TestCondition(AsyncTestCase):
 
         # Wait for callback 1 to time out
         yield gen.Task(self.io_loop.add_timeout, st + 0.2)
-        self.assertEqual(['Timeout'], history)
+        self.assertEqual(['TimeoutError'], history)
 
         c.notify_all()
-        self.assertEqual(['Timeout', 0, 2], history)
+        self.assertEqual(['TimeoutError', 0, 2], history)

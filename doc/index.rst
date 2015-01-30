@@ -81,8 +81,8 @@ absolute timestamp::
     # Wait up to 1 second
     yield condition.wait(deadline=datetime.timedelta(seconds=1))
 
-If there's no notification before the deadline, the Toro-specific
-:class:`Timeout` exception is raised.
+The method raises :exc:`tornado.gen.TimeoutError` if there's no notification
+before the deadline.
 
 .. _the-get-put-pattern:
 
@@ -98,7 +98,7 @@ notify-method:
   coroutine waiting to get an item.
 
 :meth:`Queue.get` and :meth:`Queue.put` accept deadlines and raise
-:exc:`Timeout` if the deadline passes.
+:exc:`~tornado.gen.TimeoutError` if the deadline passes.
 
 See the :doc:`examples/producer_consumer_example`.
 

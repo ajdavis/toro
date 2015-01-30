@@ -95,7 +95,7 @@ class BaseSemaphoreTests(object):
 
         # The semaphore is still locked
         self.assertTrue(sem.locked())
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield sem.acquire(deadline=timedelta(seconds=0.1))
 
         # Final release, to let the last task finish
@@ -106,7 +106,7 @@ class BaseSemaphoreTests(object):
         sem = self.semtype(2)
         yield sem.acquire()
         yield sem.acquire()
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield sem.acquire(deadline=timedelta(seconds=0.1))
 
         sem.release()
@@ -141,7 +141,7 @@ class BaseSemaphoreTests(object):
     def test_wait(self):
         sem = self.semtype()
         sem.acquire()
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield sem.wait(deadline=timedelta(seconds=0.1))
         sem.release()
 
@@ -183,7 +183,7 @@ class TestTimeoutAcquire(AsyncTestCase):
     @gen_test
     def test_timeout_acquire(self):
         s = toro.Semaphore(value=0)
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield s.acquire(deadline=timedelta(seconds=0.01))
 
     @gen_test

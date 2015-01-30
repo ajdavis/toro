@@ -6,6 +6,7 @@ from datetime import timedelta
 from functools import partial
 import time
 
+from tornado import gen
 from tornado.testing import gen_test, AsyncTestCase
 
 import toro
@@ -30,7 +31,7 @@ class TestAsyncResult(AsyncTestCase):
     @gen_test
     def test_raises_after_timeout(self):
         start = time.time()
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             async_result = toro.AsyncResult(self.io_loop)
             yield async_result.get(deadline=timedelta(seconds=0.1))
 
@@ -75,7 +76,7 @@ class TestAsyncResult(AsyncTestCase):
     def test_get_timeout(self):
         result = toro.AsyncResult(io_loop=self.io_loop)
         start = time.time()
-        with assert_raises(toro.Timeout):
+        with assert_raises(gen.TimeoutError):
             yield result.get(deadline=timedelta(seconds=0.1))
 
         duration = time.time() - start

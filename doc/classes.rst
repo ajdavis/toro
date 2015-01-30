@@ -67,13 +67,12 @@ JoinableQueue
 Exceptions
 ~~~~~~~~~~
 
-.. autoclass:: Timeout
-
 .. autoclass:: NotReady
 
 .. autoclass:: AlreadySet
 
-Toro also uses exceptions Empty_ and Full_ from the standard module Queue_.
+Toro also uses exceptions Empty_ and Full_ from the standard module Queue_,
+and :exc:`tornado.gen.TimeoutError`.
 
 .. _Empty: http://docs.python.org/library/queue.html#Queue.Empty
 

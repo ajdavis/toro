@@ -1,10 +1,9 @@
 import contextlib
 import heapq
 import collections
-from functools import partial
 from Queue import Full, Empty
 
-from tornado import ioloop
+from tornado import gen, ioloop
 from tornado.concurrent import Future
 
 
@@ -15,8 +14,8 @@ version = '.'.join(map(str, version_tuple))
 
 
 __all__ = [
-    # Exceptions
     'NotReady', 'AlreadySet', 'Full', 'Empty', 'Timeout',
+    # Exceptions. Keep exporting "Timeout" for compatibility.
 
     # Primitives
     'AsyncResult', 'Event', 'Condition',  'Semaphore', 'BoundedSemaphore',
@@ -38,45 +37,24 @@ class AlreadySet(Exception):
     pass
 
 
-class Timeout(Exception):
-    """Raised when a deadline passes before a Future is ready."""
+Timeout = gen.TimeoutError
+"""**DEPRECATED**: Alias for :exc:`tornado.gen.TimeoutError`.
 
-    def __str__(self):
-        return "Timeout"
+Preserves backward-compatibility with Toro 0.7 and older, which raised a custom
+``toro.Timeout`` exception. Your code should catch
+:exc:`tornado.gen.TimeoutError` instead of ``toro.Timeout``.
+
+.. versionadded:: 0.8
+"""
 
 
-class _TimeoutFuture(Future):
-
-    def __init__(self, deadline, io_loop):
-        """Create a Future with optional deadline.
-
-        If deadline is not None, it may be a number denoting a unix timestamp
-        (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` object
-        for a deadline relative to the current time.
-
-        set_exception(toro.Timeout()) is executed after a timeout.
-        """
-
-        super(_TimeoutFuture, self).__init__()
-        self.io_loop = io_loop
-        if deadline is not None:
-            callback = partial(self.set_exception, Timeout())
-            self._timeout_handle = io_loop.add_timeout(deadline, callback)
-        else:
-            self._timeout_handle = None
-
-    def set_result(self, result):
-        self._cancel_timeout()
-        super(_TimeoutFuture, self).set_result(result)
-
-    def set_exception(self, exception):
-        self._cancel_timeout()
-        super(_TimeoutFuture, self).set_exception(exception)
-
-    def _cancel_timeout(self):
-        if self._timeout_handle:
-            self.io_loop.remove_timeout(self._timeout_handle)
-            self._timeout_handle = None
+def _future_with_timeout(deadline, future, io_loop):
+    if deadline is not None:
+        result = gen.with_timeout(deadline, future, io_loop=io_loop)
+        gen.chain_future(result, future)
+        return result
+    else:
+        return future
 
 
 class _ContextManagerFuture(Future):
@@ -172,20 +150,20 @@ class AsyncResult(object):
         """Get a value once :meth:`set` is called. Returns a Future.
 
         The Future's result will be the value. The Future raises
-        :exc:`toro.Timeout` if no value is set before the deadline.
+        :exc:`~tornado.gen.TimeoutError` if no value is set before the deadline.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
             (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
             a deadline relative to the current time.
         """
-        future = _TimeoutFuture(deadline, self.io_loop)
+        future = Future()
         if self.ready():
             future.set_result(self.value)
+            return future
         else:
             self.waiters.append(future)
-
-        return future
+            return _future_with_timeout(deadline, future, self.io_loop)
 
     def get_nowait(self):
         """Get the value if ready, or raise :class:`NotReady`."""
@@ -220,16 +198,16 @@ class Condition(object):
     def wait(self, deadline=None):
         """Wait for :meth:`notify`. Returns a Future.
 
-        :exc:`~toro.Timeout` is executed after a timeout.
+        The Future raises :exc:`~tornado.gen.TimeoutError` after a timeout.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
-        future = _TimeoutFuture(deadline, self.io_loop)
+        future = Future()
         self.waiters.append(future)
-        return future
+        return _future_with_timeout(deadline, future, self.io_loop)
 
     def notify(self, n=1):
         """Wake up `n` waiters.
@@ -295,16 +273,16 @@ class Event(object):
     def wait(self, deadline=None):
         """Block until the internal flag is true. Returns a Future.
 
-        The Future raises :exc:`~toro.Timeout` after a timeout.
+        The Future raises :exc:`~tornado.gen.TimeoutError` after a timeout.
 
         :Parameters:
           - `callback`: Function taking no arguments.
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         if self._flag:
-            future = _TimeoutFuture(None, self.io_loop)
+            future = Future()
             future.set_result(None)
             return future
         else:
@@ -345,9 +323,9 @@ class Queue(object):
 
         self._maxsize = maxsize
 
-        # _TimeoutFutures
+        # Futures.
         self.getters = collections.deque([])
-        # Pairs of (item, _TimeoutFuture)
+        # Pairs of (item, Future).
         self.putters = collections.deque([])
         self._init(maxsize)
 
@@ -410,15 +388,14 @@ class Queue(object):
         """Put an item into the queue. Returns a Future.
 
         The Future blocks until a free slot is available for `item`, or raises
-        :exc:`toro.Timeout`.
+        :exc:`~tornado.gen.TimeoutError`.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         _consume_expired_waiters(self.getters)
-        future = _TimeoutFuture(deadline, self.io_loop)
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
             getter = self.getters.popleft()
@@ -427,15 +404,19 @@ class Queue(object):
             # case a subclass has logic that must run (e.g. JoinableQueue).
             self._put(item)
             getter.set_result(self._get())
+            future = Future()
             future.set_result(None)
+            return future
         else:
             if self.maxsize and self.maxsize <= self.qsize():
+                future = Future()
                 self.putters.append((item, future))
+                return _future_with_timeout(deadline, future, self.io_loop)
             else:
                 self._put(item)
+                future = Future()
                 future.set_result(None)
-
-        return future
+                return future
 
     def put_nowait(self, item):
         """Put an item into the queue without blocking.
@@ -458,27 +439,28 @@ class Queue(object):
         """Remove and return an item from the queue. Returns a Future.
 
         The Future blocks until an item is available, or raises
-        :exc:`toro.Timeout`.
+        :exc:`~tornado.gen.TimeoutError`.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         self._consume_expired_putters()
-        future = _TimeoutFuture(deadline, self.io_loop)
         if self.putters:
             assert self.full(), "queue not full, why are putters waiting?"
             item, putter = self.putters.popleft()
             self._put(item)
             putter.set_result(None)
-            future.set_result(self._get())
-        elif self.qsize():
-            future.set_result(self._get())
-        else:
-            self.getters.append(future)
 
-        return future
+        if self.qsize():
+            future = Future()
+            future.set_result(self._get())
+            return future
+        else:
+            future = Future()
+            self.getters.append(future)
+            return _future_with_timeout(deadline, future, self.io_loop)
 
     def get_nowait(self):
         """Remove and return an item from the queue without blocking.
@@ -597,13 +579,13 @@ class JoinableQueue(Queue):
         When the count of unfinished tasks drops to zero, :meth:`join`
         unblocks.
 
-        The Future raises :exc:`toro.Timeout` if the count is not zero before
-        the deadline.
+        The Future raises :exc:`~tornado.gen.TimeoutError` if the count is not
+        zero before the deadline.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         return self._finished.wait(deadline)
 
@@ -688,12 +670,12 @@ class Semaphore(object):
     def wait(self, deadline=None):
         """Wait for :attr:`locked` to be False. Returns a Future.
 
-        The Future raises :exc:`toro.Timeout` after the deadline.
+        The Future raises :exc:`~tornado.gen.TimeoutError` after the deadline.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         return self._unlocked.wait(deadline)
 
@@ -701,12 +683,12 @@ class Semaphore(object):
         """Decrement :attr:`counter`. Returns a Future.
 
         Block if the counter is zero and wait for a :meth:`release`. The
-        Future raises :exc:`toro.Timeout` after the deadline.
+        Future raises :exc:`~tornado.gen.TimeoutError` after the deadline.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         queue_future = self.q.get(deadline)
         if self.q.empty():
@@ -794,12 +776,12 @@ class Lock(object):
     def acquire(self, deadline=None):
         """Attempt to lock. Returns a Future.
 
-        The Future raises :exc:`toro.Timeout` if the deadline passes.
+        The Future raises :exc:`~tornado.gen.TimeoutError` after a timeout.
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         return self._block.acquire(deadline)
 
