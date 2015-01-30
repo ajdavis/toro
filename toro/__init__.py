@@ -48,6 +48,10 @@ Preserves backward-compatibility with Toro 0.7 and older, which raised a custom
 """
 
 
+_null_future = Future()
+_null_future.set_result(None)
+
+
 def _future_with_timeout(deadline, future, io_loop):
     if deadline is not None:
         result = gen.with_timeout(deadline, future, io_loop=io_loop)
@@ -282,9 +286,7 @@ class Event(object):
             a deadline relative to the current time.
         """
         if self._flag:
-            future = Future()
-            future.set_result(None)
-            return future
+            return _null_future
         else:
             return self.condition.wait(deadline)
 
@@ -404,9 +406,7 @@ class Queue(object):
             # case a subclass has logic that must run (e.g. JoinableQueue).
             self._put(item)
             getter.set_result(self._get())
-            future = Future()
-            future.set_result(None)
-            return future
+            return _null_future
         else:
             if self.maxsize and self.maxsize <= self.qsize():
                 future = Future()
@@ -414,9 +414,7 @@ class Queue(object):
                 return _future_with_timeout(deadline, future, self.io_loop)
             else:
                 self._put(item)
-                future = Future()
-                future.set_result(None)
-                return future
+                return _null_future
 
     def put_nowait(self, item):
         """Put an item into the queue without blocking.
