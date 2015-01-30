@@ -109,7 +109,7 @@ class Condition(object):
 
     def __init__(self, io_loop=None):
         self.io_loop = io_loop or ioloop.IOLoop.current()
-        self.waiters = collections.deque()  # Queue of _Waiter objects.
+        self.waiters = collections.deque()  # Futures.
 
     def __str__(self):
         result = '<%s' % (self.__class__.__name__, )
