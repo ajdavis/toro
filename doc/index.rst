@@ -102,9 +102,9 @@ notify-method:
 
 See the :doc:`examples/producer_consumer_example`.
 
-Additionally, :class:`JoinableQueue` supports
-the wait-method :meth:`JoinableQueue.join`
-and the notify-method :meth:`JoinableQueue.task_done`.
+Additionally, :class:`Queue` supports
+the wait-method :meth:`Queue.join`
+and the notify-method :meth:`Queue.task_done`.
 
 Contents
 ========

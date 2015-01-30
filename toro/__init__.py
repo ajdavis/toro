@@ -1,6 +1,7 @@
 import contextlib
 import heapq
 import collections
+import warnings
 from Queue import Full, Empty
 
 from tornado import gen, ioloop
@@ -20,7 +21,7 @@ __all__ = [
     # Primitives.
     'Event', 'Condition',  'Semaphore', 'BoundedSemaphore', 'Lock',
 
-    # Queues.
+    # Queues.  Keep exporting "JoinableQueue" for compatibility.
     'Queue', 'PriorityQueue', 'LifoQueue', 'JoinableQueue'
 ]
 
@@ -248,6 +249,9 @@ class Queue(object):
         # Pairs of (item, Future).
         self.putters = collections.deque([])
         self._init(maxsize)
+        self.unfinished_tasks = 0
+        self._finished = Event(io_loop)
+        self._finished.set()
 
     def _init(self, maxsize):
         self.queue = collections.deque()
@@ -256,6 +260,8 @@ class Queue(object):
         return self.queue.popleft()
 
     def _put(self, item):
+        self.unfinished_tasks += 1
+        self._finished.clear()
         self.queue.append(item)
 
     def __repr__(self):
@@ -273,6 +279,8 @@ class Queue(object):
             result += ' getters[%s]' % len(self.getters)
         if self.putters:
             result += ' putters[%s]' % len(self.putters)
+        if self.unfinished_tasks:
+            result += ' tasks=%s' % self.unfinished_tasks
         return result
 
     def _consume_expired_putters(self):
@@ -319,9 +327,6 @@ class Queue(object):
         if self.getters:
             assert not self.queue, "queue non-empty, why are getters waiting?"
             getter = self.getters.popleft()
-
-            # Use _put and _get instead of passing item straight to getter, in
-            # case a subclass has logic that must run (e.g. JoinableQueue).
             self._put(item)
             getter.set_result(self._get())
             return _null_future
@@ -396,6 +401,46 @@ class Queue(object):
         else:
             raise Empty
 
+    def task_done(self):
+        """Indicate that a formerly enqueued task is complete.
+
+        Used by queue consumers. For each :meth:`get <Queue.get>` used to
+        fetch a task, a subsequent call to :meth:`task_done` tells the queue
+        that the processing on the task is complete.
+
+        If a :meth:`join` is currently blocking, it will resume when all
+        items have been processed (meaning that a :meth:`task_done` call was
+        received for every item that had been :meth:`put <Queue.put>` into the
+        queue).
+
+        Raises ``ValueError`` if called more times than there were items
+        placed in the queue.
+        """
+        if self.unfinished_tasks <= 0:
+            raise ValueError('task_done() called too many times')
+        self.unfinished_tasks -= 1
+        if self.unfinished_tasks == 0:
+            self._finished.set()
+
+    def join(self, deadline=None):
+        """Block until all items in the queue are processed. Returns a Future.
+
+        The count of unfinished tasks goes up whenever an item is added to
+        the queue. The count goes down whenever a consumer calls
+        :meth:`task_done` to indicate that all work on the item is complete.
+        When the count of unfinished tasks drops to zero, :meth:`join`
+        unblocks.
+
+        The Future raises :exc:`~tornado.gen.TimeoutError` if the count is not
+        zero before the deadline.
+
+        :Parameters:
+          - `deadline`: Optional timeout, either an absolute timestamp
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
+        """
+        return self._finished.wait(deadline)
+
 
 class PriorityQueue(Queue):
     """A subclass of :class:`Queue` that retrieves entries in priority order
@@ -438,72 +483,12 @@ class LifoQueue(Queue):
 
 
 class JoinableQueue(Queue):
-    """A subclass of :class:`Queue` that additionally has :meth:`task_done`
-    and :meth:`join` methods.
-
-    .. seealso:: :doc:`examples/web_spider_example`
-
-    :Parameters:
-      - `maxsize`: Optional size limit (no limit by default).
-      - `initial`: Optional sequence of initial items.
-      - `io_loop`: Optional custom IOLoop.
-    """
+    """**DEPRECATED**: Obsolete subclass of toro.Queue."""
     def __init__(self, maxsize=0, io_loop=None):
+        warnings.warn("JoinableQueue is deprecated, use Queue.",
+                      DeprecationWarning, stacklevel=2)
+
         Queue.__init__(self, maxsize=maxsize, io_loop=io_loop)
-        self.unfinished_tasks = 0
-        self._finished = Event(io_loop)
-        self._finished.set()
-
-    def _format(self):
-        result = Queue._format(self)
-        if self.unfinished_tasks:
-            result += ' tasks=%s' % self.unfinished_tasks
-        return result
-
-    def _put(self, item):
-        self.unfinished_tasks += 1
-        self._finished.clear()
-        Queue._put(self, item)
-
-    def task_done(self):
-        """Indicate that a formerly enqueued task is complete.
-
-        Used by queue consumers. For each :meth:`get <Queue.get>` used to
-        fetch a task, a subsequent call to :meth:`task_done` tells the queue
-        that the processing on the task is complete.
-
-        If a :meth:`join` is currently blocking, it will resume when all
-        items have been processed (meaning that a :meth:`task_done` call was
-        received for every item that had been :meth:`put <Queue.put>` into the
-        queue).
-
-        Raises ``ValueError`` if called more times than there were items
-        placed in the queue.
-        """
-        if self.unfinished_tasks <= 0:
-            raise ValueError('task_done() called too many times')
-        self.unfinished_tasks -= 1
-        if self.unfinished_tasks == 0:
-            self._finished.set()
-
-    def join(self, deadline=None):
-        """Block until all items in the queue are processed. Returns a Future.
-
-        The count of unfinished tasks goes up whenever an item is added to
-        the queue. The count goes down whenever a consumer calls
-        :meth:`task_done` to indicate that all work on the item is complete.
-        When the count of unfinished tasks drops to zero, :meth:`join`
-        unblocks.
-
-        The Future raises :exc:`~tornado.gen.TimeoutError` if the count is not
-        zero before the deadline.
-
-        :Parameters:
-          - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
-            a deadline relative to the current time.
-        """
-        return self._finished.wait(deadline)
 
 
 class Semaphore(object):

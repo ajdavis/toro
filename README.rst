@@ -38,7 +38,7 @@ Here's a basic example (for more see the *examples* section of the docs):
     from tornado import ioloop, gen
     import toro
 
-    q = toro.JoinableQueue(maxsize=3)
+    q = toro.Queue(maxsize=3)
 
     @gen.coroutine
     def consumer():

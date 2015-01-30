@@ -54,11 +54,6 @@ LifoQueue
 .. autoclass:: LifoQueue
   :members:
 
-JoinableQueue
--------------
-.. autoclass:: JoinableQueue
-  :members:
-
 Exceptions
 ~~~~~~~~~~
 
@@ -75,8 +70,8 @@ Class relationships
 ~~~~~~~~~~~~~~~~~~~
 
 Toro uses some of its primitives in the implementation of others.
-For example, :class:`JoinableQueue` is a subclass of :class:`Queue`, and it
-contains an :class:`Event`.
+For example, :class:`LifoQueue` is a subclass of :class:`Queue`, and
+:class:`Queue` uses an :class:`Event`.
 
 .. graphviz::
 
@@ -89,13 +84,12 @@ contains an :class:`Event`.
 
        Queue -> PriorityQueue
        Queue -> LifoQueue
-       Queue -> JoinableQueue
        Semaphore -> BoundedSemaphore
 
        // Now UML-style composition or has-a relationships.
        edge [label="has a" arrowhead=odiamond arrowtail=none];
 
-       Event -> JoinableQueue
+       Event -> Queue
        Condition -> Event
        Event -> Semaphore
        Queue -> Semaphore

@@ -11,6 +11,7 @@ There are three sections, one each for tests that are
 import time
 from datetime import timedelta
 from Queue import Empty, Full
+import warnings
 
 from tornado import gen
 from tornado.concurrent import Future
@@ -91,14 +92,14 @@ class PriorityQueueTest1(QueueTest1):
     type2test = toro.PriorityQueue
 
 
-class TestJoinableQueue1(AsyncTestCase):
+class TestQueueJoin1(AsyncTestCase):
     def setUp(self):
-        super(TestJoinableQueue1, self).setUp()
+        super(TestQueueJoin1, self).setUp()
         self.cum = 0
 
     def test_queue_task_done(self):
         # Test to make sure a queue task completed successfully.
-        q = toro.JoinableQueue()
+        q = toro.Queue()
         try:
             q.task_done()
         except ValueError:
@@ -135,7 +136,7 @@ class TestJoinableQueue1(AsyncTestCase):
     def test_queue_join(self):
         # Test that a queue join()s successfully, and before anything else
         # (done twice for insurance).
-        q = toro.JoinableQueue()
+        q = toro.Queue()
         yield self.queue_join_test(q)
         yield self.queue_join_test(q)
         try:
@@ -254,7 +255,7 @@ class TestJoinEmpty2(AsyncTestCase):
         # Test that join() exits immediately if not jobs were put into the queue
         # From Gevent's test_issue_45()
         self.switch_expected = False
-        q = toro.JoinableQueue()
+        q = toro.Queue()
         yield q.join()
 
 
@@ -401,17 +402,16 @@ class TestQueueTimeouts3(AsyncTestCase):
         self.assertAlmostEqual(0.1, duration, places=1)
 
 
-class TestJoinableQueue3(AsyncTestCase):
+class TestQueueJoin3(AsyncTestCase):
     def test_str(self):
-        q = toro.JoinableQueue()
-        self.assertTrue('JoinableQueue' in str(q))
+        q = toro.Queue()
         self.assertFalse('tasks' in str(q))
         q.put('foo')
         self.assertTrue('tasks' in str(q))
 
     @gen_test
     def test_queue_join(self):
-        q = toro.JoinableQueue()
+        q = toro.Queue()
         yield q.put('foo')
         yield q.put('bar')
         self.assertEqual(2, q.unfinished_tasks)
@@ -426,7 +426,7 @@ class TestJoinableQueue3(AsyncTestCase):
     @gen_test
     def test_queue_join_callback(self):
         # Test that callbacks passed to join() run immediately after task_done()
-        q = toro.JoinableQueue()
+        q = toro.Queue()
         history = []
         q.put('foo')
         q.put('foo')
@@ -439,7 +439,7 @@ class TestJoinableQueue3(AsyncTestCase):
 
     @gen_test
     def test_queue_join_timeout(self):
-        q = toro.JoinableQueue()
+        q = toro.Queue()
         q.put(1)
         st = time.time()
         with assert_raises(gen.TimeoutError):
@@ -449,25 +449,10 @@ class TestJoinableQueue3(AsyncTestCase):
         self.assertAlmostEqual(0.1, duration, places=1)
         self.assertEqual(1, q.unfinished_tasks)
 
-    def test_io_loop(self):
-        global_loop = self.io_loop
-        custom_loop = IOLoop()
-        self.assertNotEqual(global_loop, custom_loop)
-        q = toro.JoinableQueue(io_loop=custom_loop)
-
-        def callback(future):
-            assert future.result() == 'foo'
-            custom_loop.stop()
-            custom_loop.close(all_fds=True)
-
-        q.get().add_done_callback(callback)
-        q.put('foo')
-        custom_loop.start()
-
     @gen_test
     def test_queue_join_clear(self):
         # Verify that join() blocks again after a task is added.
-        q = toro.JoinableQueue()
+        q = toro.Queue()
         q.put_nowait('foo')
         q.task_done()
 
@@ -483,3 +468,12 @@ class TestJoinableQueue3(AsyncTestCase):
 
         q.task_done()
         yield q.join()  # The Event is set again.
+
+
+class TestJoinableQueue(AsyncTestCase):
+    def test_joinable_queue_deprecated(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            toro.JoinableQueue()
+            assert len(w) == 1
+            assert issubclass(w[-1].category, DeprecationWarning)

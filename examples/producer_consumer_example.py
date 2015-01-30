@@ -1,10 +1,9 @@
-"""A classic producer-consumer example for using :class:`~toro.JoinableQueue`.
-"""
+"""A classic producer-consumer example for using :class:`~toro.Queue`."""
 
 # start-file
 from tornado import ioloop, gen
 import toro
-q = toro.JoinableQueue(maxsize=3)
+q = toro.Queue(maxsize=3)
 
 
 @gen.coroutine

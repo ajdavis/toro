@@ -3,11 +3,11 @@
 ``spider()`` downloads the page at `base_url` and any pages it links to,
 recursively. It ignores pages that are not beneath `base_url` hierarchically.
 
-This function demos two Toro classes: :class:`~toro.JoinableQueue` and
+This function demos two Toro classes: :class:`~toro.Queue` and
 :class:`~toro.BoundedSemaphore`.
-The :class:`~toro.JoinableQueue` is a work queue; it begins containing only
+The :class:`~toro.Queue` is a work queue; it begins containing only
 `base_url`, and each discovered URL is added to it. We wait for
-:meth:`~toro.JoinableQueue.join` to complete before exiting. This ensures that
+:meth:`~toro.Queue.join` to complete before exiting. This ensures that
 the function as a whole ends when all URLs have been downloaded.
 
 The :class:`~toro.BoundedSemaphore` regulates concurrency. We block trying to
@@ -28,7 +28,7 @@ import toro
 
 @gen.coroutine
 def spider(base_url, concurrency):
-    q = toro.JoinableQueue()
+    q = toro.Queue()
     sem = toro.BoundedSemaphore(concurrency)
 
     start = time.time()

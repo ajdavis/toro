@@ -49,6 +49,14 @@ The ``AsyncResult`` class is removed along with the exceptions it raised,
         value = yield result
         print(value)  # Prints "1".
 
+For consistency with asyncio_, ``JoinableQueue`` is deprecated.
+:class:`~toro.Queue` now implements :meth:`~toro.Queue.join` and
+:meth:`~toro.Queue.task_done`. If your code uses ``JoinableQueue``, replace it
+with :class:`~toro.Queue`.
+
+.. seealso:: Tulip issue 220, `Merge JoinableQueue with Queue
+   <https://code.google.com/p/tulip/issues/detail?id=220>`_.
+
 Changes in Version 0.8
 ----------------------
 
@@ -90,7 +98,7 @@ Changes in Version 0.6
 been treated as infinite.
 
 This feature is not intended to be useful, but to maintain an API similar to
-``asyncio`` and the standard library Queue.
+`asyncio`_ and the standard library Queue.
 
 Changes in Version 0.5
 ----------------------
@@ -145,7 +153,7 @@ managers.
 Changes in Version 0.4
 ----------------------
 
-Bugfix in :class:`~toro.JoinableQueue`, `JoinableQueue doesn't accept an
+Bugfix in ``JoinableQueue``, `JoinableQueue doesn't accept an
 explicit IOLoop <https://github.com/ajdavis/toro/issues/1>`_.
 
 Changes in Version 0.3
@@ -177,3 +185,5 @@ Version 0.1
 -----------
 
 First release.
+
+.. _asyncio: https://docs.python.org/3/library/asyncio.html
