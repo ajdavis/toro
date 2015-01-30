@@ -58,7 +58,7 @@ class ContextManagerTestsMixin(object):
             with (yield toro_obj.acquire()):
                 1 / 0
 
-        # Context manager released toro_obj
+        # Context manager released toro_obj.
         self.assertFalse(toro_obj.locked())
 
     @gen_test
@@ -86,7 +86,7 @@ class ContextManagerTestsMixin(object):
         toro_obj = self.toro_class()
 
         # Ensure we catch a "with toro_obj", which should be
-        # "with (yield toro_obj)"
+        # "with (yield toro_obj)".
         with assert_raises(RuntimeError):
             with toro_obj:
                 pass

@@ -29,14 +29,14 @@ def poll():
             response = yield client.fetch('http://www.tornadoweb.org/')
             print response.code
 
-        # Wait a tenth of a second before next request
+        # Wait a tenth of a second before next request.
         yield gen.Task(loop.add_timeout, datetime.timedelta(seconds=0.1))
 
 
 @gen.coroutine
 def shutdown():
     # Get the lock: this ensures poll() isn't in a request when we stop the
-    # loop
+    # loop.
     print 'shutdown() is acquiring the lock'
     yield lock.acquire()
     loop.stop()
@@ -44,9 +44,9 @@ def shutdown():
 
 
 if __name__ == '__main__':
-    # Start polling
+    # Start polling.
     poll()
 
-    # Arrange to shutdown cleanly 5 seconds from now
+    # Arrange to shutdown cleanly 5 seconds from now.
     loop.add_timeout(datetime.timedelta(seconds=5), shutdown)
     loop.start()

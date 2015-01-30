@@ -57,7 +57,7 @@ Here's a basic example (for more see the *examples* section of the docs):
     producer()
     consumer()
     loop = ioloop.IOLoop.instance()
-    # block until all tasks are done
+    # Block until all tasks are done.
     q.join().add_done_callback(loop.stop)
     loop.start()
 

@@ -47,7 +47,7 @@ example:
     >>> @gen.coroutine
     ... def waiter():
     ...     print "I'll wait right here"
-    ...     yield condition.wait()  # Yield a Future
+    ...     yield condition.wait()  # Yield a Future.
     ...     print "I'm done waiting"
     ...
     >>> @gen.coroutine
@@ -58,7 +58,7 @@ example:
     ...
     >>> @gen.coroutine
     ... def runner():
-    ...     # Yield two Futures; wait for waiter() and notifier() to finish
+    ...     # Yield two Futures; wait for waiter() and notifier() to finish.
     ...     yield [waiter(), notifier()]
     ...     loop.stop()
     ...
@@ -73,12 +73,12 @@ absolute timestamp::
 
     loop = ioloop.IOLoop.current()
 
-    # Wait up to 1 second for a notification
+    # Wait up to 1 second for a notification.
     yield condition.wait(deadline=loop.time() + 1)
 
 ...or a ``datetime.timedelta`` for a deadline relative to the current time::
 
-    # Wait up to 1 second
+    # Wait up to 1 second.
     yield condition.wait(deadline=datetime.timedelta(seconds=1))
 
 The method raises :exc:`tornado.gen.TimeoutError` if there's no notification

@@ -46,7 +46,7 @@ class TestCondition(AsyncTestCase):
 
         c.notify(3)
 
-        # Callbacks execute in the order they were registered
+        # Callbacks execute in the order they were registered.
         self.assertEqual(list(range(3)), history)
         c.notify(1)
         self.assertEqual(list(range(4)), history)
@@ -62,7 +62,7 @@ class TestCondition(AsyncTestCase):
         c.notify_all()
         history.append('notify_all')
 
-        # Callbacks execute in the order they were registered
+        # Callbacks execute in the order they were registered.
         self.assertEqual(
             list(range(4)) + ['notify_all'],
             history)
@@ -82,12 +82,12 @@ class TestCondition(AsyncTestCase):
         c = toro.Condition(self.io_loop)
         st = time.time()
 
-        # This fires before the wait times out
+        # This fires before the wait times out.
         self.io_loop.add_timeout(st + .1, c.notify)
         yield c.wait(deadline=timedelta(seconds=0.2))
         duration = time.time() - st
 
-        # Verify we were awakened by c.notify(), not by timeout
+        # Verify we were awakened by c.notify(), not by timeout.
         self.assertAlmostEqual(0.1, duration, places=1)
 
     @gen_test
@@ -107,7 +107,7 @@ class TestCondition(AsyncTestCase):
         c.wait().add_done_callback(make_callback(2, history))
         c.wait().add_done_callback(make_callback(3, history))
 
-        # Wait for callback 1 to time out
+        # Wait for callback 1 to time out.
         yield gen.Task(self.io_loop.add_timeout, st + 0.2)
         self.assertEqual(['TimeoutError'], history)
 
@@ -128,7 +128,7 @@ class TestCondition(AsyncTestCase):
 
         c.wait().add_done_callback(make_callback(2, history))
 
-        # Wait for callback 1 to time out
+        # Wait for callback 1 to time out.
         yield gen.Task(self.io_loop.add_timeout, st + 0.2)
         self.assertEqual(['TimeoutError'], history)
 

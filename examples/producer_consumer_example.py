@@ -29,8 +29,8 @@ if __name__ == '__main__':
 
     def stop(future):
         loop.stop()
-        future.result()  # Raise error if there is one
+        future.result()  # Raise error if there is one.
 
-    # block until all tasks are done
+    # block until all tasks are done.
     q.join().add_done_callback(stop)
     loop.start()

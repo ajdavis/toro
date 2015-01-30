@@ -33,13 +33,13 @@ class ProxyHandler(web.RequestHandler):
         path = self.request.path
         entry = cache.get(path)
         if entry:
-            # Block until the event is set, unless it's set already
+            # Block until the event is set, unless it's set already.
             yield entry.event.wait()
         else:
             print path
             cache[path] = entry = CacheEntry()
 
-            # Actually fetch the page
+            # Actually fetch the page.
             response = yield httpclient.AsyncHTTPClient().fetch(path)
             entry.type = response.headers.get('Content-Type', 'text/html')
             entry.body = response.body

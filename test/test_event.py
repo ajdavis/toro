@@ -52,7 +52,7 @@ class TestEvent(AsyncTestCase):
         duration = time.time() - st
         self.assertAlmostEqual(0.1, duration, places=1)
 
-        # After a timed-out waiter, normal operation works
+        # After a timed-out waiter, normal operation works.
         st = time.time()
         self.io_loop.add_timeout(st + 0.1, e.set)
         result = yield e.wait(deadline=timedelta(seconds=1))

@@ -23,7 +23,7 @@ from test import make_callback, assert_raises, pause
 
 # TODO: update from tulip tests
 
-# SECTION 1: Tests adapted from Gevent's test_queue.py (single underscore)
+# SECTION 1: Tests adapted from Gevent's test_queue.py (single underscore).
 
 QUEUE_SIZE = 5
 
@@ -61,7 +61,7 @@ class QueueTest1(AsyncTestCase):
             yield q.put(555, deadline=timedelta(seconds=0.01))
 
         self.assertEqual(q.qsize(), QUEUE_SIZE)
-        # Empty it
+        # Empty it.
         for i in range(QUEUE_SIZE):
             q.get_nowait()
         self.assertTrue(q.empty(), "Queue should be empty")
@@ -146,11 +146,11 @@ class TestJoinableQueue1(AsyncTestCase):
             self.fail("Did not detect task count going negative")
 
 
-# SECTION 2: Tests adapted from Gevent's test__queue.py (double underscore)
+# SECTION 2: Tests adapted from Gevent's test__queue.py (double underscore).
 
 class TestQueue2(AsyncTestCase):
     def test_repr(self):
-        # No exceptions
+        # No exceptions.
         str(toro.Queue())
         repr(toro.Queue())
 
@@ -170,7 +170,7 @@ class TestQueue2(AsyncTestCase):
             self.assertEqual('hi2', val)
             yield q.put('ok')
 
-        # Start a task; blocks on get() until we do a put()
+        # Start a task; blocks on get() until we do a put().
         f()
         yield q.put('hi2')
         self.assertEqual('ok', (yield q.get()))
@@ -201,7 +201,7 @@ class TestQueue2(AsyncTestCase):
 
     @gen_test
     def test_multiple_waiters(self):
-        # tests that multiple waiters get their results back
+        # tests that multiple waiters get their results back.
         q = toro.Queue()
 
         @gen.coroutine
@@ -211,14 +211,14 @@ class TestQueue2(AsyncTestCase):
         sendings = ['1', '2', '3', '4']
         evts = [Future() for _ in sendings]
         for i, x in enumerate(sendings):
-            waiter(q, evts[i]) # start task
+            waiter(q, evts[i])  # Start task.
 
         @gen.coroutine
         def collect_pending_results():
             results = set()
             for e in evts:
                 if e.done():
-                    # Won't block
+                    # Won't block.
                     x = yield e
                     results.add(x)
             raise gen.Return(len(results))
@@ -258,7 +258,7 @@ class TestJoinEmpty2(AsyncTestCase):
         yield q.join()
 
 
-# SECTION 3: Tests written specifically for Toro
+# SECTION 3: Tests written specifically for Toro.
 
 def bad_get_callback(_):
     raise Exception('Intentional exception in get callback')
@@ -365,7 +365,7 @@ class TestQueueTimeouts3(AsyncTestCase):
         self.assertAlmostEqual(0.1, duration, places=1)
 
         # Make sure that putting and getting a value returns Queue to initial
-        # state
+        # state.
         q.put_nowait(1)
         self.assertEqual(
             1, (yield q.get(deadline=timedelta(seconds=0.1))))
@@ -389,7 +389,7 @@ class TestQueueTimeouts3(AsyncTestCase):
         self.assertAlmostEqual(0.1, duration, places=1)
 
         # Make sure that getting and putting a value returns Queue to initial
-        # state
+        # state.
         self.assertEqual(1, (yield q.get()))
         yield q.put(1, deadline=timedelta(seconds=0.1))
 
@@ -466,16 +466,16 @@ class TestJoinableQueue3(AsyncTestCase):
 
     @gen_test
     def test_queue_join_clear(self):
-        # Verify that join() blocks again after a task is added
+        # Verify that join() blocks again after a task is added.
         q = toro.JoinableQueue()
         q.put_nowait('foo')
         q.task_done()
 
-        # The _finished Event is set
+        # The _finished Event is set.
         yield q.join()
         yield q.join()
 
-        # Unset the event
+        # Unset the event.
         q.put_nowait('bar')
 
         with assert_raises(gen.TimeoutError):

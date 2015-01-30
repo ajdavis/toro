@@ -17,10 +17,10 @@ __all__ = [
     # Exceptions. Keep exporting "Timeout" for compatibility.
     'Full', 'Empty', 'Timeout',
 
-    # Primitives
+    # Primitives.
     'Event', 'Condition',  'Semaphore', 'BoundedSemaphore', 'Lock',
 
-    # Queues
+    # Queues.
     'Queue', 'PriorityQueue', 'LifoQueue', 'JoinableQueue'
 ]
 
@@ -87,7 +87,7 @@ class _ContextManagerFuture(Future):
 
 
 def _consume_expired_waiters(waiters):
-    # Delete waiters at the head of the queue who've timed out
+    # Delete waiters at the head of the queue who've timed out.
     while waiters and waiters[0].done():
         waiters.popleft()
 
@@ -109,7 +109,7 @@ class Condition(object):
 
     def __init__(self, io_loop=None):
         self.io_loop = io_loop or ioloop.IOLoop.current()
-        self.waiters = collections.deque()  # Queue of _Waiter objects
+        self.waiters = collections.deque()  # Queue of _Waiter objects.
 
     def __str__(self):
         result = '<%s' % (self.__class__.__name__, )
@@ -137,10 +137,10 @@ class Condition(object):
         :Parameters:
           - `n`: The number of waiters to awaken (default: 1)
         """
-        waiters = []  # Waiters we plan to run right now
+        waiters = []  # Waiters we plan to run right now.
         while n and self.waiters:
             waiter = self.waiters.popleft()
-            if not waiter.done():  # Might have timed out
+            if not waiter.done():  # Might have timed out.
                 n -= 1
                 waiters.append(waiter)
 
@@ -276,7 +276,7 @@ class Queue(object):
         return result
 
     def _consume_expired_putters(self):
-        # Delete waiters at the head of the queue who've timed out
+        # Delete waiters at the head of the queue who've timed out.
         while self.putters and self.putters[0][1].done():
             self.putters.popleft()
 
@@ -546,7 +546,7 @@ class Semaphore(object):
         if value < 0:
             raise ValueError('semaphore initial value must be >= 0')
 
-        # The semaphore is implemented as a Queue with 'value' objects
+        # The semaphore is implemented as a Queue with 'value' objects.
         self.q = Queue(io_loop=io_loop)
         for _ in range(value):
             self.q.put_nowait(None)
@@ -580,7 +580,7 @@ class Semaphore(object):
         """
         self.q.put(None)
         if not self.locked():
-            # No one was waiting on acquire(), so self.q.qsize() is positive
+            # No one was waiting on acquire(), so self.q.qsize() is positive.
             self._unlocked.set()
 
     def wait(self, deadline=None):

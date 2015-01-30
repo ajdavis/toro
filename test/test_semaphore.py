@@ -15,7 +15,7 @@ import toro
 from test import make_callback, assert_raises, ContextManagerTestsMixin
 
 
-# Adapted from Gevent's lock_tests.py
+# Adapted from Gevent's lock_tests.py.
 class BaseSemaphoreTests(object):
     semtype = None
 
@@ -35,12 +35,12 @@ class BaseSemaphoreTests(object):
         result = sem.acquire()
         self.assertTrue(result)
         self.assertTrue(sem.locked())
-        # Wait for release()
+        # Wait for release().
         future = sem.wait()
         sem.release()
         yield future
 
-        # Now wait() is instant
+        # Now wait() is instant.
         yield sem.wait()
 
         sem = self.semtype(2)
@@ -65,11 +65,11 @@ class BaseSemaphoreTests(object):
             yield sem.acquire()
             results2.append(phase_num)
 
-        # Start independent tasks
+        # Start independent tasks.
         for i in range(N):
             f()
 
-        # Let them all run until the counter reaches 0
+        # Let them all run until the counter reaches 0.
         while len(results1) + len(results2) < 6:
             yield gen.Task(self.io_loop.add_callback)
 
@@ -93,12 +93,12 @@ class BaseSemaphoreTests(object):
 
         self.assertEqual(sorted(results1 + results2), [0] * 6 + [1] * 7 + [2] * 6)
 
-        # The semaphore is still locked
+        # The semaphore is still locked.
         self.assertTrue(sem.locked())
         with assert_raises(gen.TimeoutError):
             yield sem.acquire(deadline=timedelta(seconds=0.1))
 
-        # Final release, to let the last task finish
+        # Final release, to let the last task finish.
         sem.release()
 
     @gen_test
@@ -124,14 +124,14 @@ class BaseSemaphoreTests(object):
         def f():
             yield sem.acquire()
 
-            # Allow switching
+            # Allow switching.
             yield gen.Task(self.io_loop.add_callback)
             sem.release()
             f_finished[0] = True
 
         future = f()
 
-        # Let f run
+        # Let f run.
         yield gen.Task(self.io_loop.add_timeout, time.time() + 0.01)
         self.assertFalse(f_finished[0])
         sem.release()
@@ -153,7 +153,7 @@ class SemaphoreTests(BaseSemaphoreTests, AsyncTestCase):
     semtype = toro.Semaphore
 
     def test_release_unacquired(self):
-        # Unbounded releases are allowed and increment the semaphore's value
+        # Unbounded releases are allowed and increment the semaphore's value.
         sem = self.semtype(1)
         sem.release()
         sem.acquire()
@@ -168,7 +168,7 @@ class BoundedSemaphoreTests(BaseSemaphoreTests, AsyncTestCase):
     semtype = toro.BoundedSemaphore
 
     def test_release_unacquired(self):
-        # Cannot go past the initial value
+        # Cannot go past the initial value.
         sem = self.semtype()
         self.assertRaises(ValueError, sem.release)
         sem.acquire()
@@ -178,7 +178,7 @@ class BoundedSemaphoreTests(BaseSemaphoreTests, AsyncTestCase):
 BoundedSemaphoreTests.__test__ = True
 
 
-# Adapted from Gevent's test__semaphore.py
+# Adapted from Gevent's test__semaphore.py.
 class TestTimeoutAcquire(AsyncTestCase):
     @gen_test
     def test_timeout_acquire(self):
@@ -198,10 +198,10 @@ class TestTimeoutAcquire(AsyncTestCase):
         self.assertEqual(result, ['a', 'b'])
 
 
-# Not adapted from Gevent's tests, specific to Toro
+# Not adapted from Gevent's tests, specific to Toro.
 class SemaphoreTests2(AsyncTestCase):
     def test_repr(self):
-        # No exceptions
+        # No exceptions.
         str(toro.Semaphore())
         repr(toro.Semaphore())
 
@@ -230,13 +230,13 @@ class SemaphoreTests2(AsyncTestCase):
         sem.release()
         history.append('release3')
         self.assertEqual([
-            # First release wakes first acquire
+            # First release wakes first acquire.
             'acquire1', 'release1',
 
-            # Second release wakes second acquire
+            # Second release wakes second acquire.
             'acquire2', 'release2',
 
-            # Third release wakes all waits
+            # Third release wakes all waits.
             'wait1', 'wait2', 'release3'
         ], history)
 

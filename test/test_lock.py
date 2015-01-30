@@ -66,11 +66,11 @@ class LockTests(AsyncTestCase):
         self.assertEqual(len(phase), 2)
 
 
-# Not adapted from Gevent's tests, written just for Toro
+# Not adapted from Gevent's tests, written just for Toro.
 class LockTests2(AsyncTestCase):
     def test_str(self):
         lock = toro.Lock()
-        # No errors in various states
+        # No errors in various states.
         str(lock)
         lock.acquire()
         str(lock)

@@ -47,7 +47,7 @@ def spider(base_url, concurrency):
             fetched.add(current_url)
 
             for new_url in urls:
-                # Only follow links beneath the base URL
+                # Only follow links beneath the base URL.
                 if new_url.startswith(base_url):
                     yield q.put(new_url)
 
@@ -59,7 +59,7 @@ def spider(base_url, concurrency):
     def worker():
         while True:
             yield sem.acquire()
-            # Launch a subtask
+            # Launch a subtask.
             fetch_url()
 
     q.put(base_url)
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     
     def stop(future):
         loop.stop()
-        future.result()  # Raise error if there is one
+        future.result()  # Raise error if there is one.
         
     future = spider('http://www.tornadoweb.org/en/stable/', 10)
     future.add_done_callback(stop)
