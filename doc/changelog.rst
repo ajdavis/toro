@@ -11,6 +11,17 @@ Dropped support for Tornado 3.
 The following API changes are intended to make Toro as consistent as possible
 with `asyncio's locks and queues`_:
 
+locks and queues submodules
+'''''''''''''''''''''''''''
+
+Toro's synchronization primitives have been moved into ``toro.locks`` and
+the queue classes are now in ``toro.queues``. These are equivalent::
+
+    from toro import Queue
+    from toro.queues import Queue
+
+Both import styles will be supported indefinitely.
+
 Timeout
 '''''''
 
