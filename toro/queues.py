@@ -278,7 +278,6 @@ class PriorityQueue(Queue):
 
     :Parameters:
       - `maxsize`: Optional size limit (no limit by default).
-      - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
     def _init(self, maxsize):
@@ -297,7 +296,6 @@ class LifoQueue(Queue):
 
     :Parameters:
       - `maxsize`: Optional size limit (no limit by default).
-      - `initial`: Optional sequence of initial items.
       - `io_loop`: Optional custom IOLoop.
     """
     def _init(self, maxsize):
