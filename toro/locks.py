@@ -47,6 +47,7 @@ class _ContextManagerFuture(Future):
                 self.exit_callback()
         return f()
 
+
 class Condition(object):
     """A condition allows one or more coroutines to wait until notified.
 
