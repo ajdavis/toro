@@ -36,7 +36,7 @@ Preserves backward-compatibility with Toro 0.7 and older, which raised a custom
 ``toro.Timeout`` exception. Your code should catch
 :exc:`tornado.gen.TimeoutError` instead of ``toro.Timeout``.
 
-.. versionadded:: 0.8
+.. versionadded:: 0.9
 """
 
 
