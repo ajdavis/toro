@@ -82,11 +82,21 @@ class ContextManagerTestsMixin(object):
 
         self.assertEqual(expected_history, history)
 
+    @gen_test
+    def test_yield_obj(self):
+        toro_obj = self.toro_class()
+
+        # Ensure we catch a "with (yield toro_obj)", which should be
+        # "with (yield toro_obj.acquire)".
+        with assert_raises(gen.BadYieldError):
+            with (yield toro_obj):
+                pass
+
     def test_context_manager_misuse(self):
         toro_obj = self.toro_class()
 
         # Ensure we catch a "with toro_obj", which should be
-        # "with (yield toro_obj)".
+        # "with (yield toro_obj.acquire)".
         with assert_raises(RuntimeError):
             with toro_obj:
                 pass

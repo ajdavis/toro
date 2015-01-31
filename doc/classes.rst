@@ -68,7 +68,7 @@ Class relationships
 
 Toro uses some of its primitives in the implementation of others.
 For example, :class:`LifoQueue` is a subclass of :class:`Queue`, and
-:class:`Queue` uses an :class:`Event`.
+:class:`Queue` uses an :class:`Event`. :class:`Semaphore` stands alone.
 
 .. graphviz::
 
@@ -88,7 +88,5 @@ For example, :class:`LifoQueue` is a subclass of :class:`Queue`, and
 
        Event -> Queue
        Condition -> Event
-       Event -> Semaphore
-       Queue -> Semaphore
        Semaphore -> Lock
    }

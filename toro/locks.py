@@ -176,7 +176,6 @@ class Semaphore(object):
     >>> from tornado import gen
     >>> import toro
     >>> semaphore = toro.Semaphore()
-    >>>
     >>> @gen.coroutine
     ... def f():
     ...    with (yield semaphore.acquire()):
@@ -201,55 +200,35 @@ class Semaphore(object):
         if value < 0:
             raise ValueError('semaphore initial value must be >= 0')
 
-        # The semaphore is implemented as a Queue with 'value' objects.
-        from .queues import Queue
-        self.q = Queue(io_loop=io_loop)
-        for _ in range(value):
-            self.q.put_nowait(None)
-
-        self._unlocked = Event(io_loop=io_loop)
-        if value:
-            self._unlocked.set()
+        self.io_loop = io_loop or ioloop.IOLoop.current()
+        self._value = value
+        self._waiters = collections.deque()
 
     def __repr__(self):
-        return '<%s at %s%s>' % (
-            type(self).__name__, hex(id(self)), self._format())
-
-    def __str__(self):
-        return '<%s%s>' % (
-            self.__class__.__name__, self._format())
-
-    def _format(self):
-        return ' counter=%s' % self.counter
+        res = super(Semaphore, self).__repr__()
+        extra = 'locked' if self.locked() else 'unlocked,value:{}'.format(
+            self._value)
+        if self._waiters:
+            extra = '{},waiters:{}'.format(extra, len(self._waiters))
+        return '<{} [{}]>'.format(res[1:-1], extra)
 
     @property
     def counter(self):
-        """An integer, the current semaphore value"""
-        return self.q.qsize()
+        """An integer, the current semaphore value."""
+        return self._value
 
     def locked(self):
-        """True if :attr:`counter` is zero"""
-        return self.q.empty()
+        """True if the semaphore cannot be acquired immediately."""
+        return self._value == 0
 
     def release(self):
-        """Increment :attr:`counter` and wake one waiter.
-        """
-        self.q.put(None)
-        if not self.locked():
-            # No one was waiting on acquire(), so self.q.qsize() is positive.
-            self._unlocked.set()
-
-    def wait(self, deadline=None):
-        """Wait for :attr:`locked` to be False. Returns a Future.
-
-        The Future raises :exc:`~tornado.gen.TimeoutError` after the deadline.
-
-        :Parameters:
-          - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
-            a deadline relative to the current time.
-        """
-        return self._unlocked.wait(deadline)
+        """Increment :attr:`counter` and wake one waiter."""
+        self._value += 1
+        for waiter in self._waiters:
+            if not waiter.done():
+                self._value -= 1
+                waiter.set_result(None)
+                break
 
     def acquire(self, deadline=None):
         """Decrement :attr:`counter`. Returns a Future.
@@ -262,15 +241,18 @@ class Semaphore(object):
             (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
             a deadline relative to the current time.
         """
-        queue_future = self.q.get(deadline)
-        if self.q.empty():
-            self._unlocked.clear()
-        future = _ContextManagerFuture(queue_future, self.release)
-        return future
+        if self._value > 0:
+            self._value -= 1
+            future = _util.null_future
+        else:
+            waiter = Future()
+            self._waiters.append(waiter)
+            future = _util.future_with_timeout(deadline, waiter, self.io_loop)
+        return _ContextManagerFuture(future, self.release)
 
     def __enter__(self):
         raise RuntimeError(
-            "Use Semaphore like 'with (yield semaphore)', not like"
+            "Use Semaphore like 'with (yield semaphore.acquire)', not like"
             " 'with semaphore'")
 
     __exit__ = __enter__
@@ -295,7 +277,7 @@ class BoundedSemaphore(Semaphore):
     def release(self):
         if self.counter >= self._initial_value:
             raise ValueError("Semaphore released too many times")
-        return super(BoundedSemaphore, self).release()
+        super(BoundedSemaphore, self).release()
 
 
 class Lock(object):

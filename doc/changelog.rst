@@ -71,6 +71,11 @@ The ``AsyncResult`` class is removed along with the exceptions it raised,
         value = yield result
         print(value)  # Prints "1".
 
+Semaphore
+'''''''''
+
+The ``Semaphore.wait`` method is removed, use :meth:`Semaphore.acquire`.
+
 JoinableQueue
 '''''''''''''
 

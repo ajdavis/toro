@@ -24,9 +24,15 @@ class BaseSemaphoreTests(object):
         self.assertRaises(ValueError, self.semtype, value = -sys.maxint)
 
     def test_str(self):
-        q = self.semtype(5)
-        self.assertTrue(self.semtype.__name__ in str(q))
-        self.assertTrue('counter=5' in str(q))
+        sem = self.semtype(1)
+        self.assertTrue(self.semtype.__name__ in str(sem))
+        self.assertIn('unlocked,value:1', str(sem))
+        sem.acquire()
+        self.assertIn('locked', str(sem))
+        self.assertNotIn('waiters', str(sem))
+        sem.acquire()
+        self.assertIn('waiters', str(sem))
+
 
     @gen_test
     def test_acquire(self):
@@ -36,12 +42,13 @@ class BaseSemaphoreTests(object):
         self.assertTrue(result)
         self.assertTrue(sem.locked())
         # Wait for release().
-        future = sem.wait()
+        future = sem.acquire()
         sem.release()
         yield future
 
-        # Now wait() is instant.
-        yield sem.wait()
+        # Now acquire() is instant.
+        sem.release()
+        yield sem.acquire()
 
         sem = self.semtype(2)
         sem.acquire()
@@ -137,14 +144,6 @@ class BaseSemaphoreTests(object):
         sem.release()
         yield future
 
-    @gen_test
-    def test_wait(self):
-        sem = self.semtype()
-        sem.acquire()
-        with assert_raises(gen.TimeoutError):
-            yield sem.wait(deadline=timedelta(seconds=0.1))
-        sem.release()
-
 
 class SemaphoreTests(BaseSemaphoreTests, AsyncTestCase):
     """
@@ -208,21 +207,11 @@ class SemaphoreTests2(AsyncTestCase):
     @gen_test
     def test_acquire_callback(self):
         # Test that callbacks passed to acquire() run immediately after
-        # release(), and that wait() callbacks aren't run until a release()
-        # with no waiters on acquire().
+        # release().
         sem = toro.Semaphore(0)
         history = []
         sem.acquire().add_done_callback(make_callback('acquire1', history))
         sem.acquire().add_done_callback(make_callback('acquire2', history))
-
-        def wait_callback(name):
-            def cb(_):
-                self.assertFalse(sem.locked())
-                history.append(name)
-            return cb
-
-        sem.wait().add_done_callback(wait_callback('wait1'))
-        sem.wait().add_done_callback(wait_callback('wait2'))
         sem.release()
         history.append('release1')
         sem.release()
@@ -236,11 +225,10 @@ class SemaphoreTests2(AsyncTestCase):
             # Second release wakes second acquire.
             'acquire2', 'release2',
 
-            # Third release wakes all waits.
-            'wait1', 'wait2', 'release3'
+            # Third release.
+            'release3',
         ], history)
 
 
 class SemaphoreContextManagerTest(ContextManagerTestsMixin, AsyncTestCase):
-
     toro_class = toro.Semaphore
