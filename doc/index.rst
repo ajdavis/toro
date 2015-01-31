@@ -60,9 +60,8 @@ example:
     ... def runner():
     ...     # Yield two Futures; wait for waiter() and notifier() to finish.
     ...     yield [waiter(), notifier()]
-    ...     loop.stop()
     ...
-    >>> future = runner(); loop.start()
+    >>> loop.run_sync(runner)
     I'll wait right here
     About to notify
     Done notifying
