@@ -8,10 +8,21 @@ Changes in Next Version
 
 Dropped support for Tornado 3.
 
+The following API changes are intended to make Toro as consistent as possible
+with `asyncio's locks and queues`_:
+
+Timeout
+'''''''
+
 Instead of raising a ``toro.Timeout`` exception, Toro's methods now raise the
 standard :exc:`tornado.gen.TimeoutError`. For now, ``toro.Timeout`` is aliased
 to :exc:`tornado.gen.TimeoutError` for compatibility. But if your code catches
 ``toro.Timeout``, update it to catch :exc:`tornado.gen.TimeoutError`.
+
+.. _asyncio's locks and queues: https://docs.python.org/3/library/asyncio-sync.html
+
+AsyncResult
+'''''''''''
 
 The ``AsyncResult`` class is removed along with the exceptions it raised,
 ``NotReady`` and ``AlreadySet``. It was redundant with
@@ -49,7 +60,10 @@ The ``AsyncResult`` class is removed along with the exceptions it raised,
         value = yield result
         print(value)  # Prints "1".
 
-For consistency with asyncio_, ``JoinableQueue`` is deprecated.
+JoinableQueue
+'''''''''''''
+
+``JoinableQueue`` is deprecated.
 :class:`~toro.Queue` now implements :meth:`~toro.Queue.join` and
 :meth:`~toro.Queue.task_done`. If your code uses ``JoinableQueue``, replace it
 with :class:`~toro.Queue`.
@@ -57,11 +71,15 @@ with :class:`~toro.Queue`.
 .. seealso:: Tulip issue 220, `Merge JoinableQueue with Queue
    <https://code.google.com/p/tulip/issues/detail?id=220>`_.
 
-Also for consistency with asyncio, :class:`Queue` now raises Toro-specific
+QueueEmpty and QueueFull
+''''''''''''''''''''''''
+
+:class:`Queue` now raises Toro-specific
 exceptions :exc:`QueueEmpty` and :exc:`QueueFull` instead of the Python
 standard exceptions ``queue.Empty`` and ``queue.Full``. For compatibility,
 these new exceptions *inherit* from the standard exceptions. However, if your
 code catches the standard exceptions, update it to catch Toro's exceptions.
+
 
 Changes in Version 0.8
 ----------------------
