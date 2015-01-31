@@ -25,9 +25,9 @@ def poll():
     client = httpclient.AsyncHTTPClient()
     while True:
         with (yield lock.acquire()):
-            print 'Starting request'
+            print('Starting request')
             response = yield client.fetch('http://www.tornadoweb.org/')
-            print response.code
+            print(response.code)
 
         # Wait a tenth of a second before next request.
         yield gen.Task(loop.add_timeout, datetime.timedelta(seconds=0.1))
@@ -37,10 +37,10 @@ def poll():
 def shutdown():
     # Get the lock: this ensures poll() isn't in a request when we stop the
     # loop.
-    print 'shutdown() is acquiring the lock'
+    print('shutdown() is acquiring the lock')
     yield lock.acquire()
     loop.stop()
-    print 'Loop stopped.'
+    print('Loop stopped.')
 
 
 if __name__ == '__main__':

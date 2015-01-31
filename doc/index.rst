@@ -46,15 +46,15 @@ example:
     >>> condition = toro.Condition()
     >>> @gen.coroutine
     ... def waiter():
-    ...     print "I'll wait right here"
+    ...     print("I'll wait right here")
     ...     yield condition.wait()  # Yield a Future.
-    ...     print "I'm done waiting"
+    ...     print("I'm done waiting")
     ...
     >>> @gen.coroutine
     ... def notifier():
-    ...     print "About to notify"
+    ...     print("About to notify")
     ...     condition.notify()
-    ...     print "Done notifying"
+    ...     print("Done notifying")
     ...
     >>> @gen.coroutine
     ... def runner():

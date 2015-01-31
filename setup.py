@@ -40,10 +40,6 @@ long_description = open("README.rst").read()
 
 major, minor = sys.version_info[:2]
 
-kwargs = {}
-if major >= 3:
-    kwargs['use_2to3'] = True
-
 packages = ['toro']
 if "test" in sys.argv:
     packages.append('test')
@@ -60,6 +56,4 @@ setup(name='toro',
       license='http://www.apache.org/licenses/LICENSE-2.0',
       classifiers=filter(None, classifiers.split('\n')),
       keywords='tornado coroutines semaphore mutex queue asynchronous',
-      test_suite='test',
-      **kwargs
-)
+      test_suite='test')

@@ -41,7 +41,7 @@ def spider(base_url, concurrency):
             if current_url in fetching:
                 return
 
-            print 'fetching', current_url
+            print('fetching %s' % current_url)
             fetching.add(current_url)
             urls = yield get_links_from_url(current_url)
             fetched.add(current_url)
@@ -68,8 +68,8 @@ def spider(base_url, concurrency):
     worker()
     yield q.join(deadline=timedelta(seconds=300))
     assert fetching == fetched
-    print 'Done in %d seconds, fetched %s URLs.' % (
-        time.time() - start, len(fetched))
+    print('Done in %d seconds, fetched %s URLs.' % (
+        time.time() - start, len(fetched)))
 
 
 @gen.coroutine
@@ -81,11 +81,11 @@ def get_links_from_url(url):
     """
     try:
         response = yield httpclient.AsyncHTTPClient().fetch(url)
-        print 'fetched', url
+        print('fetched' % url)
         urls = [urlparse.urljoin(url, remove_fragment(new_url))
                 for new_url in get_links(response.body)]
     except Exception, e:
-        print e, url
+        print('%s %s' % (e, url))
         raise gen.Return([])
 
     raise gen.Return(urls)

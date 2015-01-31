@@ -6,7 +6,6 @@ Adapted from Gevent's lock_tests.py and test__semaphore.py.
 
 from datetime import timedelta
 import time
-import sys
 
 from tornado import gen
 from tornado.testing import gen_test, AsyncTestCase
@@ -20,8 +19,7 @@ class BaseSemaphoreTests(object):
     semtype = None
 
     def test_constructor(self):
-        self.assertRaises(ValueError, self.semtype, value = -1)
-        self.assertRaises(ValueError, self.semtype, value = -sys.maxint)
+        self.assertRaises(ValueError, self.semtype, value=-1)
 
     def test_str(self):
         sem = self.semtype(1)

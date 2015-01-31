@@ -122,7 +122,7 @@ class TestQueueJoin1(AsyncTestCase):
         self.cum = 0
         for i in (0,1):
             self.worker(q)
-        for i in xrange(100):
+        for i in range(100):
             q.put(i)
         yield q.join()
         self.assertEqual(self.cum, sum(range(100)),

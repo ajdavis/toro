@@ -8,6 +8,8 @@ Changes in Next Version
 
 Dropped support for Tornado 3.
 
+Support Python 2 and 3 with the same source code. No longer uses ``auto2to3``.
+
 Fixed Queue producer-consumer example: it had exited too early.
 
 The following API changes are intended to make Toro as consistent as possible

@@ -13,7 +13,7 @@ def consumer():
     while True:
         item = yield q.get()
         try:
-            print 'Doing work on', item
+            print('Doing work on %s' % item)
         finally:
             q.task_done()
 
@@ -21,7 +21,7 @@ def consumer():
 @gen.coroutine
 def producer():
     for item in range(10):
-        print 'Putting', item
+        print('Putting %s' % item)
         yield q.put(item)
 
 

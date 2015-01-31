@@ -7,7 +7,11 @@ import collections
 import heapq
 import warnings
 from functools import partial
-from Queue import Full, Empty
+try:
+    from Queue import Full, Empty
+except ImportError:
+    # Python 3.
+    from queue import Full, Empty
 
 from tornado import ioloop
 from tornado.concurrent import Future
