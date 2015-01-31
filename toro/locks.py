@@ -5,7 +5,7 @@ __all__ = ['Event', 'Condition',  'Semaphore', 'BoundedSemaphore', 'Lock']
 import contextlib
 import collections
 
-from tornado import ioloop
+from tornado import gen, ioloop
 from tornado.concurrent import Future
 
 from . import _util
@@ -25,14 +25,8 @@ class _ContextManagerFuture(Future):
     """
     def __init__(self, wrapped, exit_callback):
         super(_ContextManagerFuture, self).__init__()
-        wrapped.add_done_callback(self._done_callback)
+        gen.chain_future(wrapped, self)
         self.exit_callback = exit_callback
-
-    def _done_callback(self, wrapped):
-        if wrapped.exception():
-            self.set_exception(wrapped.exception())
-        else:
-            self.set_result(wrapped.result())
 
     def result(self):
         if self.exception():
