@@ -15,13 +15,13 @@ Documentation: http://toro.readthedocs.org/
 About
 =====
 A set of locking and synchronizing primitives analogous to those in Python's
-`threading module`_ or Gevent's `coros`_, for use with Tornado's `gen.engine`_.
+`threading module`_ or Gevent's `coros`_, for Tornado coroutines_.
 
 .. _threading module: http://docs.python.org/library/threading.html
 
 .. _coros: http://www.gevent.org/gevent.coros.html
 
-.. _gen.engine: http://www.tornadoweb.org/documentation/gen.html
+.. _coroutines:: http://www.tornadoweb.org/documentation/gen.html
 
 Dependencies
 ============
