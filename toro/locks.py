@@ -206,11 +206,11 @@ class Semaphore(object):
 
     def __repr__(self):
         res = super(Semaphore, self).__repr__()
-        extra = 'locked' if self.locked() else 'unlocked,value:{}'.format(
+        extra = 'locked' if self.locked() else 'unlocked,value:{0}'.format(
             self._value)
         if self._waiters:
-            extra = '{},waiters:{}'.format(extra, len(self._waiters))
-        return '<{} [{}]>'.format(res[1:-1], extra)
+            extra = '{0},waiters:{1}'.format(extra, len(self._waiters))
+        return '<{0} [{1}]>'.format(res[1:-1], extra)
 
     @property
     def counter(self):
