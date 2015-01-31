@@ -6,6 +6,7 @@ __all__ = ['Queue', 'PriorityQueue', 'LifoQueue', 'JoinableQueue',
 import collections
 import heapq
 import warnings
+from functools import partial
 from Queue import Full, Empty
 
 from tornado import ioloop
@@ -194,7 +195,12 @@ class Queue(object):
 
         if self.qsize():
             future = Future()
-            future.set_result(self._get())
+
+            # Defer unblocking the getter, which might do task_done() without
+            # yielding first. We want putters to have a chance to run first and
+            # keep join() blocked. See producer_consumer_example.py and
+            # test_queue_join_with_blocked_putter.
+            self.io_loop.add_callback(partial(future.set_result, self._get()))
             return future
         else:
             future = Future()

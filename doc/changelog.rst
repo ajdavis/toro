@@ -8,6 +8,8 @@ Changes in Next Version
 
 Dropped support for Tornado 3.
 
+Fixed Queue producer-consumer example: it had exited too early.
+
 The following API changes are intended to make Toro as consistent as possible
 with `asyncio's locks and queues`_:
 

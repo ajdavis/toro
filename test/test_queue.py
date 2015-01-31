@@ -423,6 +423,19 @@ class TestQueueJoin3(AsyncTestCase):
         yield future
 
     @gen_test
+    def test_queue_join_with_blocked_putter(self):
+        q = toro.Queue(maxsize=1)
+        q.put(0)
+        put_future = q.put(1)
+        join_future = q.join()
+        yield q.get()
+        self.assertTrue(put_future.done())
+
+        # There's a waiting putter, so task_done() does not resolve join().
+        q.task_done()
+        self.assertFalse(join_future.done())
+
+    @gen_test
     def test_queue_join_callback(self):
         # Test that callbacks passed to join() run immediately after task_done()
         q = toro.Queue()

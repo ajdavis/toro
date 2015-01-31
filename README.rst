@@ -38,7 +38,9 @@ Here's a basic example (for more see the *examples* section of the docs):
     from tornado import ioloop, gen
     import toro
 
+    loop = ioloop.IOLoop.instance()
     q = toro.Queue(maxsize=3)
+
 
     @gen.coroutine
     def consumer():
@@ -49,17 +51,23 @@ Here's a basic example (for more see the *examples* section of the docs):
             finally:
                 q.task_done()
 
+
     @gen.coroutine
     def producer():
         for item in range(10):
+            print 'Putting', item
             yield q.put(item)
 
-    producer()
-    consumer()
-    loop = ioloop.IOLoop.instance()
-    # Block until all tasks are done.
-    q.join().add_done_callback(loop.stop)
-    loop.start()
+
+    @gen.coroutine
+    def main():
+        producer()
+        consumer()
+
+        # Block until all tasks are done.
+        yield q.join()
+
+    loop.run_sync(main)
 
 Documentation
 =============
