@@ -38,7 +38,9 @@ description = 'Synchronization primitives for Tornado coroutines.'
 
 long_description = open("README.rst").read()
 
-major, minor = sys.version_info[:2]
+kwargs = {}
+if sys.version_info[:2] == (2, 6):
+    kwargs['tests_require'] = 'unittest2'
 
 packages = ['toro']
 if "test" in sys.argv:
@@ -56,4 +58,5 @@ setup(name='toro',
       license='http://www.apache.org/licenses/LICENSE-2.0',
       classifiers=filter(None, classifiers.split('\n')),
       keywords='tornado coroutines semaphore mutex queue asynchronous',
-      test_suite='test')
+      test_suite='test',
+      **kwargs)
