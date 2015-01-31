@@ -109,9 +109,6 @@ def _consume_expired_waiters(waiters):
         waiters.popleft()
 
 
-_null_result = object()
-
-
 class Condition(object):
     """A condition allows one or more coroutines to wait until notified.
 
