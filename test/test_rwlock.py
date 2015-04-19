@@ -199,7 +199,7 @@ class RWLockWriteTests2(AsyncTestCase):
         lock = toro.RWLock(max_readers=10)
         lock.acquire_write()
         lock.release_write()
-        self.assertRaises(RuntimeError, lock.release_read)
+        self.assertRaises(RuntimeError, lock.release_write)
 
 
 class RWLockWithReadDefault(toro.RWLock):
