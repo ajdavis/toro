@@ -920,8 +920,16 @@ class RWLock(object):
             (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
             a deadline relative to the current time.
         """
-        managers = yield [self._block.acquire(deadline) for _ in
-                          xrange(self._max_readers)]
+        futures = [self._block.acquire(deadline) for _ in
+                   xrange(self._max_readers)]
+        try:
+            managers = yield futures
+        except Timeout:
+            for f in futures:
+                # Avoid traceback logging.
+                f.exception()
+            raise
+
         raise gen.Return(_ContextManagerList(managers))
 
     def release_read(self):
