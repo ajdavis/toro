@@ -79,6 +79,7 @@ class _TimeoutFuture(Future):
             self.io_loop.remove_timeout(self._timeout_handle)
             self._timeout_handle = None
 
+
 class _ContextManagerList(list):
     def __enter__(self, *args, **kwargs):
         for obj in self:
@@ -87,6 +88,7 @@ class _ContextManagerList(list):
     def __exit__(self, *args, **kwargs):
         for obj in self:
             obj.__exit__(*args, **kwargs)
+
 
 class _ContextManagerFuture(Future):
     """A Future that can be used with the "with" statement.
@@ -837,24 +839,26 @@ class Lock(object):
 
 
 class RWLock(object):
-    """A read-write lock for coroutines.
+    """A reader-writer lock for coroutines.
 
-    It is created unlocked. When unlocked, :meth:`acquire_write` always changes the state
-    to locked. When unlocked, :meth:`acquire_read` can changes the state
-    to locked, if :meth:`acquire_read` was called max_readers times. When the state is locked, 
-    yielding :meth:`acquire_read`/meth:`acquire_write` waits until a call to :meth:`release_write`
-    in case of locking on write, or :meth:`release_read` in case of locking on read.
+    It is created unlocked. When unlocked, :meth:`acquire_write` always changes
+    the state to locked. When unlocked, :meth:`acquire_read` can changed the
+    state to locked, if :meth:`acquire_read` was called max_readers times. When
+    the state is locked, yielding :meth:`acquire_read`/meth:`acquire_write`
+    waits until a call to :meth:`release_write` in case of locking on write, or
+    :meth:`release_read` in case of locking on read.
 
-    The :meth:`release_read` method should only be called in the locked on read state;
-    an attempt to release an unlocked lock raises RuntimeError.
+    The :meth:`release_read` method should only be called in the locked-on-read
+    state; an attempt to release an unlocked lock raises RuntimeError.
 
-    The :meth:`release_write` method should only be called in the locked on write state;
-    an attempt to release an unlocked lock raises RuntimeError.
+    The :meth:`release_write` method should only be called in the locked on
+    write state; an attempt to release an unlocked lock raises RuntimeError.
 
     When more than one coroutine is waiting for the lock, the first one
     registered is awakened by :meth:`release_read`/:meth:`release_write`.
 
-    :meth:`acquire_read`/:meth:`acquire_write` support the context manager protocol:
+    :meth:`acquire_read`/:meth:`acquire_write` support the context manager
+    protocol:
 
     >>> from tornado import gen
     >>> import toro
@@ -900,8 +904,8 @@ class RWLock(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
         return self._block.acquire(deadline)
 
@@ -913,17 +917,18 @@ class RWLock(object):
 
         :Parameters:
           - `deadline`: Optional timeout, either an absolute timestamp
-            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for a
-            deadline relative to the current time.
+            (as returned by ``io_loop.time()``) or a ``datetime.timedelta`` for
+            a deadline relative to the current time.
         """
-        managers = yield [self._block.acquire(deadline) for i in xrange(self._max_readers)]
+        managers = yield [self._block.acquire(deadline) for _ in
+                          xrange(self._max_readers)]
         raise gen.Return(_ContextManagerList(managers))
 
     def release_read(self):
-        """releases one reader.
+        """Releases one reader.
 
-        If any coroutines are waiting for :meth:`acquire_read` (in case of full readers queue),
-        the first in line is awakened.
+        If any coroutines are waiting for :meth:`acquire_read` (in case of full
+        readers queue), the first in line is awakened.
 
         If not locked, raise a RuntimeError.
         """
@@ -932,7 +937,7 @@ class RWLock(object):
         self._block.release()
 
     def release_write(self):
-        """releases after write.
+        """Releases after write.
 
         The first in queue will be awakened after release.
 
