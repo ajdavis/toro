@@ -6,6 +6,10 @@ Changelog
 Changes in Next Version
 -----------------------
 
+:class:`.RWLock` contributed by
+`Alexander Gridnev <https://github.com/alexander-gridnev>`_.
+
+
 Changes in Version 0.8
 ----------------------
 
