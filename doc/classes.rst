@@ -21,6 +21,11 @@ Lock
 .. autoclass:: Lock
   :members:
 
+RWLock
+----
+.. autoclass:: RWLock
+  :members:
+
 Semaphore
 ---------
 .. autoclass:: Semaphore
