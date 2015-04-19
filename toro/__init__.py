@@ -885,7 +885,7 @@ class RWLock(object):
     .. seealso:: :doc:`examples/lock_example`
 
     :Parameters:
-      - `max_readers`: Optional max readers value.
+      - `max_readers`: Optional max readers value, default 1.
       - `io_loop`: Optional custom IOLoop.
     """
     def __init__(self, max_readers=1, io_loop=None):
