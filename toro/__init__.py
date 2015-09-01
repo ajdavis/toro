@@ -882,14 +882,6 @@ class RWLock(object):
     ...
     ...    assert not lock.locked()
 
-    .. note:: Unlike with the standard threading.Lock_, code in a
-      single-threaded Tornado application can check if a :class:`RWLock`
-      is :meth:`locked`, and act on that information without fear that another
-      thread has grabbed the lock, provided you do not yield to the IOLoop
-      between checking :meth:`locked` and using a protected resource.
-
-    .. _threading.Lock: http://docs.python.org/2/library/threading.html#lock-objects
-
     :Parameters:
       - `max_readers`: Optional max readers value, default 1.
       - `io_loop`: Optional custom IOLoop.
