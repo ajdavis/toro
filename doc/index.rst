@@ -23,10 +23,9 @@ Toro provides to Tornado coroutines a set of locking primitives and queues
 analogous to those that Gevent provides to Greenlets, or that the standard
 library provides to threads.
 
-*(Note that these primitives and queues are not actually thread-safe and cannot
-be used in place of those from the standard library--they are meant to
-coordinate Tornado coroutines in single-threaded apps, not to protect shared
-objects in multithreaded apps.)*
+.. important:: Toro is completed and deprecated; its features have been merged
+  into Tornado. Development of locks and queues for Tornado coroutines continues
+  in Tornado itself.
 
 .. _gen: http://www.tornadoweb.org/en/stable/gen.html
 
