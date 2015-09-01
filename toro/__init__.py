@@ -362,6 +362,7 @@ class Queue(object):
         self.putters = collections.deque([])
         self._init(maxsize)
 
+    # These three are overridable in subclasses.
     def _init(self, maxsize):
         self.queue = collections.deque()
 
