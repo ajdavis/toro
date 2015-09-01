@@ -4,6 +4,7 @@ import collections
 from functools import partial
 from Queue import Full, Empty
 
+import tornado
 from tornado import ioloop
 from tornado import gen
 from tornado.concurrent import Future
@@ -100,7 +101,7 @@ class _ContextManagerFuture(Future):
             pass
 
     At the end of the block, the Future's exit callback is run. Used for
-    Lock.acquire() and Semaphore.acquire().
+    Lock.acquire, Semaphore.acquire, RWLock.acquire_read / acquire_write.
     """
     def __init__(self, wrapped, exit_callback):
         super(_ContextManagerFuture, self).__init__()
@@ -839,6 +840,12 @@ class Lock(object):
     __exit__ = __enter__
 
 
+if tornado.version_info[:2] >= (4, 2):
+    tornado_multi_future = gen.multi_future
+else:
+    tornado_multi_future = lambda futures, quiet_exceptions: futures
+
+
 class RWLock(object):
     """A reader-writer lock for coroutines.
 
@@ -922,7 +929,8 @@ class RWLock(object):
         futures = [self._block.acquire(deadline) for _ in
                    xrange(self._max_readers)]
         try:
-            managers = yield futures
+            managers = yield tornado_multi_future(futures,
+                                                  quiet_exceptions=Timeout)
         except Timeout:
             for f in futures:
                 # Avoid traceback logging.
