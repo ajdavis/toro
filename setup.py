@@ -49,7 +49,7 @@ if "test" in sys.argv:
     packages.append('test')
 
 setup(name='toro',
-      version='0.8+',
+      version='1.0',
       packages=packages,
       description=description,
       long_description=long_description,

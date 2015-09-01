@@ -9,6 +9,10 @@ toro
 
 Documentation: http://toro.readthedocs.org/
 
+.. important:: Toro is completed and deprecated; its features have been merged
+  into Tornado. Development of locks and queues for Tornado coroutines continues
+  in Tornado itself.
+
 .. image:: https://travis-ci.org/ajdavis/toro.png
         :target: https://travis-ci.org/ajdavis/toro
 

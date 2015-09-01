@@ -3,11 +3,22 @@ Changelog
 
 .. module:: toro
 
-Changes in Next Version
------------------------
+Changes in Version 1.0
+----------------------
 
-:class:`.RWLock` contributed by
+This is the final release of Toro. Its features are merged into Tornado 4.2.
+Further development of locks and queues for Tornado coroutines will continue
+in Tornado.
+
+For more information on the end of Toro,
+`read my article <http://emptysqua.re/blog/tornado-locks-and-queues/>`_.
+The Tornado changelog has comprehensive instructions on
+`porting from Toro's locks and queues to Tornado 4.2 locks and queues
+<http://www.tornadoweb.org/en/stable/releases/v4.2.0.html#new-modules-tornado-locks-and-tornado-queues>`_.
+
+Toro 1.0 has one new feature, an :class:`.RWLock` contributed by
 `Alexander Gridnev <https://github.com/alexander-gridnev>`_.
+:class:`.RWLock` has *not* been merged into Tornado.
 
 
 Changes in Version 0.8
