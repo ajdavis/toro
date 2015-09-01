@@ -22,7 +22,7 @@ Lock
   :members:
 
 RWLock
-----
+------
 .. autoclass:: RWLock
   :members:
 
