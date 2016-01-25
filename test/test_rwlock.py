@@ -26,6 +26,12 @@ class RWLockReadTests(AsyncTestCase):
         lock.release_read()
         self.assertFalse(lock.locked())
 
+    def test_release_unlocked(self):
+        lock = toro.RWLock(max_readers=1)
+
+        with assert_raises(RuntimeError):
+            lock.release_read()
+
     @gen_test
     def test_acquire_contended(self):
         lock = toro.RWLock(max_readers=1)
@@ -76,6 +82,7 @@ class RWLockWriteTests(AsyncTestCase):
         self.assertFalse(lock.locked())
         yield lock.acquire_write()
         self.assertTrue(lock.locked())
+        lock.release_write()
         self.assertFalse(lock.locked())
 
     @gen_test
@@ -351,3 +358,31 @@ class RWLockTests3(AsyncTestCase):
         duration = time.time() - st
         self.assertAlmostEqual(0.1, duration, places=1)
         self.assertTrue(lock.locked())
+
+    @gen_test
+    def test_partial_release(self):
+        lock = toro.RWLock(max_readers=5)
+        N = 5
+
+        for i in range(N):
+            yield lock.acquire_read()
+
+        for i in range(N):
+            lock.release_read()
+
+        yield lock.acquire_write()
+        lock.release_write()
+
+    @gen_test
+    def test_release_unlocked(self):
+        lock = toro.RWLock(max_readers=5)
+        N = 5
+
+        for i in range(N):
+            yield lock.acquire_read()
+
+        for i in range(N):
+            lock.release_read()
+
+        with assert_raises(RuntimeError):
+            lock.release_read()

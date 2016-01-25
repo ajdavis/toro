@@ -939,7 +939,7 @@ class RWLock(object):
 
         If not locked, raise a RuntimeError.
         """
-        if not self.locked():
+        if self._block.counter == self._max_readers:
             raise RuntimeError('release unlocked lock')
         self._block.release()
 
