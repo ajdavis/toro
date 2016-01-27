@@ -10,7 +10,7 @@ from tornado import gen
 from tornado.concurrent import Future
 
 
-version_tuple = (1, 0, 1)
+version_tuple = (1, 0, 1, 'dev0')
 
 version = '.'.join(map(str, version_tuple))
 """Current version of Toro."""
