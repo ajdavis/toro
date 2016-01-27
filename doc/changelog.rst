@@ -3,8 +3,8 @@ Changelog
 
 .. module:: toro
 
-Changes in Version 1.1
-----------------------
+Changes in Version 1.0.1
+------------------------
 
 Bug fix in :class:`~toro.RWLock`: when max_readers > 1
 :meth:`~toro.RWLock.release_read` must release one reader
@@ -21,6 +21,8 @@ in case :meth:`~toro.RWLock.acquire_read` was called at least once::
 But, in old version :meth:`~toro.RWLock.release_read` raises RuntimeException
 if a lock in unlocked state, even if :meth:`~toro.RWLock.acquire_read`
 was already called several times.
+
+Patch by `Alexander Gridnev <https://github.com/alexander-gridnev>`_.
 
 
 Changes in Version 1.0
