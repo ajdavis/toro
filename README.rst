@@ -7,7 +7,7 @@ toro
 :Info: Synchronization primitives for Tornado coroutines.
 :Author: A\. Jesse Jiryu Davis
 
-Documentation: http://toro.readthedocs.org/
+Documentation: https://toro.readthedocs.io/
 
 .. important:: Toro is completed and deprecated; its features have been merged
   into Tornado. Development of locks and queues for Tornado coroutines continues
