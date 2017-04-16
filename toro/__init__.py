@@ -1,3 +1,4 @@
+import itertools
 import contextlib
 import heapq
 import collections
@@ -221,7 +222,7 @@ class Condition(object):
 
     def __init__(self, io_loop=None):
         self.io_loop = io_loop or ioloop.IOLoop.current()
-        self.waiters = collections.deque()  # Queue of _Waiter objects
+        self.waiters = {}
 
     def __str__(self):
         result = '<%s' % (self.__class__.__name__, )
@@ -240,28 +241,27 @@ class Condition(object):
             deadline relative to the current time.
         """
         future = _TimeoutFuture(deadline, self.io_loop)
-        self.waiters.append(future)
+        self.waiters[id(future)] = future
         return future
 
-    def notify(self, n=1):
+    def notify(self, n=1, result=None):
         """Wake up `n` waiters.
 
         :Parameters:
           - `n`: The number of waiters to awaken (default: 1)
         """
-        waiters = []  # Waiters we plan to run right now
-        while n and self.waiters:
-            waiter = self.waiters.popleft()
-            if not waiter.done():  # Might have timed out
-                n -= 1
-                waiters.append(waiter)
-
+        if not n > 0:
+            return
+        waiters = itertools.islice((waiter for waiter in self.waiters.values() if not waiter.done()), n)
         for waiter in waiters:
-            waiter.set_result(None)
+            waiter.set_result(result)
 
-    def notify_all(self):
+    def notify_all(self, result=None):
         """Wake up all waiters."""
-        self.notify(len(self.waiters))
+        self.notify(len(self.waiters), result=result)
+
+    def remove_waiter(self, waiter):
+        del self.waiters[id(waiter)]
 
 
 # TODO: show correct examples that avoid thread / process issues w/ concurrent.futures.Future
