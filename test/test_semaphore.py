@@ -20,8 +20,8 @@ class BaseSemaphoreTests(object):
     semtype = None
 
     def test_constructor(self):
-        self.assertRaises(ValueError, self.semtype, value = -1)
-        self.assertRaises(ValueError, self.semtype, value = -sys.maxint)
+        self.assertRaises(ValueError, self.semtype, value=-1)
+        self.assertRaises(ValueError, self.semtype, value=-sys.maxint)
 
     def test_str(self):
         q = self.semtype(5)
